@@ -1,0 +1,6 @@
+language: go
+rvm:
+ - 1.14.6
+script:
+ - go get github.com/bwmarrin/discordgo
+ - go test
