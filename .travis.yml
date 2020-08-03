@@ -4,5 +4,8 @@ rvm:
 script:
  - go get github.com/bwmarrin/discordgo
  - go test
-after_success:
- - git push heroku master
+deploy:
+  provider: heroku
+  api_key:
+    secure: $HEROKU_API_KEY
+  app: zawacki-discord-bot
