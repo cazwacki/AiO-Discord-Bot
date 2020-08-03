@@ -34,7 +34,7 @@ func TestMessageResponse(t *testing.T) {
 	t.Run("Responds to ~uptime", func(t *testing.T) {
 		dg.ChannelMessageSend("739852388264968243", "~uptime")
 		time.Sleep(200 * time.Millisecond) // allow response to populate
-		regex := regexp.MustCompile(`Uptime: \d\.\d{7}s`)
+		regex := regexp.MustCompile(`^Uptime: \d\.\ds$`)
 		if !regex.MatchString(response) {
 			t.Logf("Failed to respond correctly to ~uptime; Response was `" + response + "`")
 			t.Fail()

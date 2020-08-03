@@ -13,8 +13,6 @@ import (
 var start time.Time
 
 func Run_bot(token string) {
-	fmt.Println("token is : " + token)
-
 	start = time.Now()
 
 	dg, err := discordgo.New("Bot " + token)
@@ -49,7 +47,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	// If the message is "ping" reply with "Pong!"
 	if m.Content == "~uptime" {
-		s.ChannelMessageSend(m.ChannelID, "Uptime: "+time.Since(start).String())
+		s.ChannelMessageSend(m.ChannelID, "Uptime: "+time.Since(start).Truncate(time.Second/10).String())
 	}
 
 	if m.Content == "~shutdown" {
