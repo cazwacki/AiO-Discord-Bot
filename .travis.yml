@@ -2,7 +2,6 @@ language: go
 rvm:
  - 1.14.6
 script:
- - cd src
  - go get github.com/bwmarrin/discordgo
  - go test
 after_success:
