@@ -5,4 +5,4 @@ script:
  - go get github.com/bwmarrin/discordgo
  - go test
 after_success:
- - test "$TRAVIS_BRANCH" = "master" && sh .travis/deploy_heroku.sh
+ - git push heroku master
