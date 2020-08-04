@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,14 +53,22 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-	// If the message is "ping" reply with "Pong!"
-	if m.Content == "~uptime" {
-		s.ChannelMessageSend(m.ChannelID, "Uptime: "+time.Since(start).Truncate(time.Second/10).String())
-	}
 
-	if m.Content == "~shutdown" {
-		s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
-		s.Close()
-		os.Exit(0)
+	parsedCommand := strings.Split(m.Content, " ")
+
+	switch parsedCommand[0] {
+	// management commands
+	case "~uptime":
+		Handle_uptime(s, m, start)
+	case "~shutdown":
+		Handle_shutdown(s, m)
+	case "~invite":
+		Handle_invite(s, m)
+	case "~nick":
+		Handle_nickname(s, m, parsedCommand)
+	case "~kick":
+		Handle_kick(s, m, parsedCommand)
+	case "~ban":
+		Handle_ban(s, m, parsedCommand)
 	}
 }
