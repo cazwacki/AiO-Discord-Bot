@@ -70,5 +70,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Handle_kick(s, m, parsedCommand)
 	case "~ban":
 		Handle_ban(s, m, parsedCommand)
+	// dbd commands
+	case "~perk":
+		Handle_perk(s, m, parsedCommand)
+	case "~shrine":
+		Handle_shrine(s, m)
+	case "~autoshrine":
+		Handle_autoshrine(s, m)
 	}
 }
