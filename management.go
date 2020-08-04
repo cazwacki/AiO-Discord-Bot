@@ -10,7 +10,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// validates permissions before moving forward with executing a command
+/**
+Used to validate a user's permissions before moving forward with a command. Prevents command abuse.
+If the user has administrator permissions, just automatically allow them to perform any bot command.
+**/
 func user_has_valid_permissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int) bool {
 	perms, err := s.UserChannelPermissions(m.Author.ID, m.ChannelID)
 	if err != nil {
@@ -25,7 +28,10 @@ func user_has_valid_permissions(s *discordgo.Session, m *discordgo.MessageCreate
 	}
 }
 
-// helper function for ban / kick commands
+/**
+Given a userID, generates a DM if one does not already exist with the user and sends the specified
+message to them.
+**/
 func dmUser(s *discordgo.Session, m *discordgo.MessageCreate, userID string, message string) {
 	channel, err := s.UserChannelCreate(userID)
 	if err != nil {
@@ -36,7 +42,10 @@ func dmUser(s *discordgo.Session, m *discordgo.MessageCreate, userID string, mes
 	}
 }
 
-// helper function for Handle_nickname
+/**
+A helper function for Handle_nick. Ensures the user targeted a user using @; if they did,
+attempt to rename the specified user.
+**/
 func attempt_rename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if regex.MatchString(command[1]) && len(command) > 2 {
@@ -55,7 +64,10 @@ func attempt_rename(s *discordgo.Session, m *discordgo.MessageCreate, command []
 	}
 }
 
-// helper function for Handle_kick
+/**
+A helper function for Handle_kick. Ensures the user targeted a user using @; if they did,
+attempt to kick the specified user.
+**/
 func attempt_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if len(command) >= 2 {
@@ -84,6 +96,10 @@ func attempt_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	}
 }
 
+/**
+A helper function for Handle_ban. Ensures the user targeted a user using @; if they did,
+attempt to ban the specified user.
+**/
 func attempt_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if len(command) >= 2 {
@@ -112,16 +128,26 @@ func attempt_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	}
 }
 
+/**
+Outputs the bot's current uptime.
+**/
 func Handle_uptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
-	s.ChannelMessageSend(m.ChannelID, "Uptime: "+time.Since(start).Truncate(time.Second/10).String())
+	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start).Truncate(time.Second/10).String())
 }
 
+/**
+Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
+**/
 func Handle_shutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
 	s.Close()
 	os.Exit(0)
 }
 
+/**
+Generates an invite code to the channel in which ~invite was invoked if the user has the
+permission to create instant invites.
+**/
 func Handle_invite(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if user_has_valid_permissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		var invite discordgo.Invite
@@ -140,6 +166,10 @@ func Handle_invite(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+/**
+Nicknames the user if they target themselves, or nicknames a target user if the user who invoked
+~nick has the permission to change nicknames.
+**/
 func Handle_nickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if user_has_valid_permissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID) {
 		// see if user is trying to self-nickname
@@ -152,6 +182,9 @@ func Handle_nickname(s *discordgo.Session, m *discordgo.MessageCreate, command [
 	}
 }
 
+/**
+Kicks a user from the server if the invoking user has the permission to kick users.
+**/
 func Handle_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if user_has_valid_permissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
@@ -161,6 +194,9 @@ func Handle_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	}
 }
 
+/**
+Bans a user from the server if the invoking user has the permission to ban users.
+**/
 func Handle_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if user_has_valid_permissions(s, m, discordgo.PermissionBanMembers) {
 		// validate caller has permission to kick other users

@@ -42,9 +42,18 @@ func TestMessageResponse(t *testing.T) {
 	t.Run("Responds correctly to ~uptime", func(t *testing.T) {
 		dg.ChannelMessageSend("739852388264968243", "~uptime")
 		time.Sleep(time_between_commands) // allow response to populate
-		regex := regexp.MustCompile(`^Uptime: \d\.\ds$`)
+		regex := regexp.MustCompile(`^:robot: Uptime: \d\.\ds$`)
 		if !regex.MatchString(response) {
 			t.Logf("Failed to respond correctly to ~uptime; Response was `" + response + "`")
+			t.Fail()
+		}
+	})
+
+	t.Run("Generates invitation", func(t *testing.T) {
+		dg.ChannelMessageSend("739852388264968243", "~invite")
+		time.Sleep(time_between_commands) // allow response to populate
+		if strings.HasPrefix(response, ":mailbox_with_mail: Here's your invitation! https://discord.gg/") == false {
+			t.Logf("Failed to generate invitation")
 			t.Fail()
 		}
 	})
@@ -92,15 +101,6 @@ func TestMessageResponse(t *testing.T) {
 		time.Sleep(time_between_commands) // allow response to populate
 		if response != "Usage: `~ban @<user> (reason: optional)`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
-			t.Fail()
-		}
-	})
-
-	t.Run("Generates invitation", func(t *testing.T) {
-		dg.ChannelMessageSend("739852388264968243", "~invite")
-		time.Sleep(time_between_commands) // allow response to populate
-		if strings.HasPrefix(response, ":mailbox_with_mail: Here's your invitation! https://discord.gg/") == false {
-			t.Logf("Failed to generate invitation")
 			t.Fail()
 		}
 	})
