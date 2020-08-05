@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
 
+	"github.com/ChimeraCoder/anaconda"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
 )
@@ -224,6 +226,7 @@ func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry! I wasn't able to get the shrine :frowning:")
 	} else {
 		fmt.Println("Here's the shrine!")
+		// construct embed response
 		var embed discordgo.MessageEmbed
 		embed.URL = "https://deadbydaylight.gamepedia.com/Shrine_of_Secrets#Current_Shrine_of_Secrets"
 		embed.Type = "rich"
@@ -247,13 +250,68 @@ func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
 		footer.Text = shrine.TimeUntilReset
 		footer.IconURL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
 		embed.Footer = &footer
+
+		// send response
 		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	}
 }
 
 /**
+When a new shrine tweet is received, construct a message and post it to the designated
+autoshrine channel.
+*/
+func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
+	if strings.HasPrefix(v.Text, "This week's shrine is:") {
+		// construct embed response
+		var embed discordgo.MessageEmbed
+		splitText := strings.Split(strings.ReplaceAll(v.FullText, "&amp;", "&"), " ")
+		embed.URL = splitText[len(splitText)-1]
+		embed.Type = "rich"
+		embed.Title = "Latest Shrine (@DeadbyBHVR)"
+		embed.Description = strings.Join(splitText[0:len(splitText)-2], " ")
+		var image discordgo.MessageEmbedImage
+		image.URL = v.Entities.Media[0].Media_url
+		embed.Image = &image
+		var thumbnail discordgo.MessageEmbedThumbnail
+		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
+		embed.Thumbnail = &thumbnail
+
+		buf, err := ioutil.ReadFile("./autoshrine_channel")
+		if err != nil {
+			Handle_tweet(s, v)
+			return
+		}
+
+		// send response
+		s.ChannelMessageSendEmbed(string(buf), &embed)
+	}
+}
+
+/**
+Helper function for Handle_autoshrine. Writes the new channel to file.
+*/
+func set_new_channel(channel string) bool {
+	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0755)
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+/**
 Switches the channel that the tweet monitoring system will output to.
 **/
-func Handle_autoshrine(s *discordgo.Session, m *discordgo.MessageCreate) {
-
+func Handle_autoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if strings.HasPrefix(command[1], "<#") {
+		// remove formatting
+		channel := strings.ReplaceAll(command[1], "<#", "")
+		channel = strings.ReplaceAll(channel, ">", "")
+		if set_new_channel(channel) {
+			s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+		} else {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
+		}
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+	}
 }

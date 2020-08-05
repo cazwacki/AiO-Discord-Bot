@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -15,6 +17,8 @@ var start time.Time
 var prod_mode bool
 
 func Run_bot(token string) {
+
+	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prod_mode = true
 	}
@@ -34,6 +38,12 @@ func Run_bot(token string) {
 		return
 	}
 
+	/** Open Connection to Twitter **/
+	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
+	anaconda.SetConsumerSecret(os.Getenv("TWITTER_API_SECRET"))
+	api := anaconda.NewTwitterApi(os.Getenv("TWITTER_TOKEN"), os.Getenv("TWITTER_TOKEN_SECRET"))
+	go run_twitter_loop(api, dg)
+
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
@@ -42,6 +52,24 @@ func Run_bot(token string) {
 
 	// Cleanly close down the Discord session.
 	dg.Close()
+}
+
+/**
+Opens a stream looking for new tweets from @DeadbyBHVR, who posts the weekly
+shrine on Twitter.
+*/
+func run_twitter_loop(api *anaconda.TwitterApi, dg *discordgo.Session) {
+	fmt.Println("Starting...")
+	v := url.Values{}
+	v.Set("follow", "4850837842") // @DeadbyBHVR is 4850837842
+	v.Set("track", "shrine")
+	s := api.PublicStreamFilter(v)
+	for t := range s.C {
+		switch v := t.(type) {
+		case anaconda.Tweet:
+			Handle_tweet(dg, v)
+		}
+	}
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -76,6 +104,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "~shrine":
 		Handle_shrine(s, m)
 	case "~autoshrine":
-		Handle_autoshrine(s, m)
+		Handle_autoshrine(s, m, parsedCommand)
 	}
 }

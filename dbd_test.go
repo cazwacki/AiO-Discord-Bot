@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -46,6 +47,15 @@ func TestScraping(t *testing.T) {
 		}
 		if perk.Quote != "\"U mad?\" — Feng Min " {
 			t.Logf("Failed to populate quote correctly: '" + perk.Quote + "'")
+			t.Fail()
+		}
+	})
+
+	t.Run("~autoshrine actually changes the file", func(t *testing.T) {
+		set_new_channel("739852388264968243")
+		currentChannel, _ := ioutil.ReadFile("./autoshrine_channel")
+		if string(currentChannel) != "739852388264968243" {
+			t.Logf("Failed to change autoshrine channel; " + string(currentChannel))
 			t.Fail()
 		}
 	})
