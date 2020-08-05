@@ -302,14 +302,18 @@ func set_new_channel(channel string) bool {
 Switches the channel that the tweet monitoring system will output to.
 **/
 func Handle_autoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if strings.HasPrefix(command[1], "<#") {
-		// remove formatting
-		channel := strings.ReplaceAll(command[1], "<#", "")
-		channel = strings.ReplaceAll(channel, ">", "")
-		if set_new_channel(channel) {
-			s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+	if len(command) == 2 {
+		if strings.HasPrefix(command[1], "<#") {
+			// remove formatting
+			channel := strings.ReplaceAll(command[1], "<#", "")
+			channel = strings.ReplaceAll(channel, ">", "")
+			if set_new_channel(channel) {
+				s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+			} else {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
+			}
 		} else {
-			s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
 		}
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
