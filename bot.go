@@ -82,8 +82,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if prod_mode && m.ChannelID == "739852388264968243" {
 		return
 	}
-	// Ignore all messages created by the bot itself
-	if m.Author.ID == s.State.User.ID {
+	// Ignore all messages created by the bot itself as well as DMs
+	if m.Author.ID == s.State.User.ID || m.GuildID == "" {
 		return
 	}
 
