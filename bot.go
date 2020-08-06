@@ -110,16 +110,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Handle_shrine(s, m)
 	case "~autoshrine":
 		Handle_autoshrine(s, m, parsedCommand)
-		// lookup commands
-		/*
-			case "~define":
-				Handle_define(s, m, parsedCommand)
-			case "~google":
-				Handle_google(s, m, parsedCommand)
-			case "~image":
-				Handle_image(s, m, parsedCommand)
-			case "~help":
-				Handle_help(s, m)
-		*/
+	// lookup commands
+	case "~define":
+		Handle_define(s, m, parsedCommand)
+	case "~google":
+		Handle_google(s, m, parsedCommand)
+	case "~image":
+		Handle_image(s, m, parsedCommand)
+	case "~help":
+		Handle_help(s, m)
 	}
 }
