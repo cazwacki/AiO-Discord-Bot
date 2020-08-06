@@ -118,7 +118,7 @@ func scrape_perk(perk string) Perk {
 	}
 
 	/** Get Perk GIF **/
-	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+	doc.Find(".wikitable").First().Find("img").Each(func(i int, s *goquery.Selection) {
 		currentSrc := s.AttrOr("src", "nil")
 		if strings.Contains(currentSrc, ".gif") {
 			resultingPerk.IconURL = currentSrc
