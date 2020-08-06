@@ -268,7 +268,7 @@ func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
 		embed.URL = splitText[len(splitText)-1]
 		embed.Type = "rich"
 		embed.Title = "Latest Shrine (@DeadbyBHVR)"
-		embed.Description = strings.Join(splitText[0:len(splitText)-2], " ")
+		embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
 		var image discordgo.MessageEmbedImage
 		image.URL = v.Entities.Media[0].Media_url
 		embed.Image = &image
