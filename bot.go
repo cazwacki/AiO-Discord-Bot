@@ -50,8 +50,9 @@ func Run_bot(token string) {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
 
-	// Cleanly close down the Discord session.
+	// Cleanly close down the Discord session and Twitter connection.
 	dg.Close()
+	api.Close()
 }
 
 /**
@@ -72,6 +73,10 @@ func run_twitter_loop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	}
 }
 
+/**
+Handler function when the discord session detects a message is created in
+a channel that the bot has access to.
+*/
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore my testing channel
 	if prod_mode && m.ChannelID == "739852388264968243" {
@@ -105,5 +110,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		Handle_shrine(s, m)
 	case "~autoshrine":
 		Handle_autoshrine(s, m, parsedCommand)
+	// lookup commands
+	case "~define":
+		Handle_define(s, m, parsedCommand)
+	case "~google":
+		Handle_google(s, m, parsedCommand)
+	case "~image":
+		Handle_image(s, m, parsedCommand)
+	case "~help":
+		Handle_help(s, m)
 	}
 }
