@@ -24,7 +24,7 @@ Bot for my discord server hooked up to a CI/CD system and developed in Go.
 ## Things I Have Learned
 
 ### Setting up CI/CD
-1. I create an issue on Github describing what I want to implement in the bot
+1. I create an issue on Github describing what I want to implement in the bot.
 2. I make commits to a Github branch dedicated to adding the specific feature I want to add.
 3. Each commit triggers Travis CI to run tests on my commit and evaluate whether the build passes tests.
 3. When the feature branch is ready and tests are established, I create a merge request for the branch.
@@ -38,4 +38,4 @@ Bot for my discord server hooked up to a CI/CD system and developed in Go.
 3. I use it to populate the messages sent to the channel.
 
 ### New Language: Go
-I wanted to learn a new language since we are limited to C and Java in classes. I've done Javascript before, so I decidede to write the bot in Go.
+I wanted to learn a new language since we are limited to C and Java in classes. I've done Javascript before, so I decided to write the bot in Go.
