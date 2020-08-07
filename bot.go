@@ -15,6 +15,13 @@ import (
 
 var start time.Time
 var prod_mode bool
+var globalImageSet []*ImageSet
+
+func appendToGlobalImageSet(newset ImageSet) {
+	globalImageSet = append(globalImageSet, &newset)
+	fmt.Println("Global Image Set:")
+	fmt.Println(globalImageSet)
+}
 
 func Run_bot(token string) {
 
@@ -31,6 +38,7 @@ func Run_bot(token string) {
 	}
 
 	dg.AddHandler(messageCreate)
+	dg.AddHandler(messageReactionAdd)
 
 	err = dg.Open()
 	if err != nil {
@@ -73,9 +81,57 @@ func run_twitter_loop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	}
 }
 
+func Handle_help(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// return all current commands and what they do
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "How to use ZawackiBot"
+	var thumbnail discordgo.MessageEmbedThumbnail
+	thumbnail.URL = "https://static.thenounproject.com/png/1248-200.png"
+	embed.Thumbnail = &thumbnail
+	var commands []*discordgo.MessageEmbedField
+	commands = append(commands, createCommand("~uptime", "Reports the bot's current uptime."))
+	commands = append(commands, createCommand("~shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart."))
+	commands = append(commands, createCommand("~invite", "Generates a server invitation valid for 24 hours."))
+	commands = append(commands, createCommand("~nick @user <nickname>", "Renames the specified user to the provided nickname."))
+	commands = append(commands, createCommand("~kick @user (reason: optional)", "Kicks the specified user from the server."))
+	commands = append(commands, createCommand("~ban @user (reason:optional)", "Bans the specified user from the server."))
+	commands = append(commands, createCommand("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk."))
+	commands = append(commands, createCommand("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki."))
+	commands = append(commands, createCommand("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted."))
+	commands = append(commands, createCommand("~define <word/phrase>", "Returns a definition of the word/phrase if it is available."))
+	commands = append(commands, createCommand("~google <word/phrase>", "Returns the first five google results returned from the query."))
+	commands = append(commands, createCommand("~image <word/phrase>", "Returns the first image from Google Images."))
+	commands = append(commands, createCommand("~help", "Returns how to use each of the commands the bot has available."))
+	embed.Fields = commands
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "Created by Charles Zawacki; Written in Go"
+	footer.IconURL = "https://avatars0.githubusercontent.com/u/44577941?s=460&u=4eb7b9ff5410be189eea9863c33916c805dbd2b2&v=4"
+	embed.Footer = &footer
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
+}
+
 /**
 Handler function when the discord session detects a message is created in
 a channel that the bot has access to.
+
+TODO: Make a map of {
+	command
+	description/help
+	handler_function
+}
+Then this "code" would be:
+dispatcher = commands[parsedCommand[0]];
+if (dispatcher != null) {
+	dispatcher(s, m, parsedCommand);
+}
+
+Similarly, the help function above would be really easy
+commands.forEach() {
+	add command.description to the result message.
+}
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore my testing channel
@@ -90,34 +146,90 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	parsedCommand := strings.Split(m.Content, " ")
 
 	switch parsedCommand[0] {
+	case "~help":
+		go Handle_help(s, m)
 	// management commands
 	case "~uptime":
-		Handle_uptime(s, m, start)
+		go Handle_uptime(s, m, start)
 	case "~shutdown":
-		Handle_shutdown(s, m)
+		go Handle_shutdown(s, m)
 	case "~invite":
-		Handle_invite(s, m)
+		go Handle_invite(s, m)
 	case "~nick":
-		Handle_nickname(s, m, parsedCommand)
+		go Handle_nickname(s, m, parsedCommand)
 	case "~kick":
-		Handle_kick(s, m, parsedCommand)
+		go Handle_kick(s, m, parsedCommand)
 	case "~ban":
-		Handle_ban(s, m, parsedCommand)
+		go Handle_ban(s, m, parsedCommand)
 	// dbd commands
 	case "~perk":
-		Handle_perk(s, m, parsedCommand)
+		go Handle_perk(s, m, parsedCommand)
 	case "~shrine":
-		Handle_shrine(s, m)
+		go Handle_shrine(s, m)
 	case "~autoshrine":
-		Handle_autoshrine(s, m, parsedCommand)
+		go Handle_autoshrine(s, m, parsedCommand)
 	// lookup commands
 	case "~define":
-		Handle_define(s, m, parsedCommand)
+		go Handle_define(s, m, parsedCommand)
 	case "~google":
-		Handle_google(s, m, parsedCommand)
+		go Handle_google(s, m, parsedCommand)
 	case "~image":
-		Handle_image(s, m, parsedCommand)
-	case "~help":
-		Handle_help(s, m)
+		go Handle_image(s, m, parsedCommand)
+	}
+}
+
+/**
+Used to handle scrolling through images given from ~image.
+*/
+func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
+	// Ignore all messages created by the bot itself as well as DMs
+	if m.UserID == s.State.User.ID {
+		return
+	}
+	for i, set := range globalImageSet {
+		if set.MessageID == m.MessageID {
+			if m.Emoji.Name == "⬅️" || m.Emoji.Name == "➡️" || m.Emoji.Name == "⏹️" {
+				/*
+					1. Remove the reaction the user made
+					2. Switch the image if the index allows
+					3. Update the index in the set
+				*/
+				if m.Emoji.Name == "⏹️" {
+					// remove reactions and remove from list
+					tmpSet := globalImageSet[0]
+					globalImageSet[0] = globalImageSet[i]
+					globalImageSet[i] = tmpSet
+					globalImageSet = globalImageSet[1:]
+					s.MessageReactionsRemoveAll(m.ChannelID, m.MessageID)
+				} else {
+					// craft response and send
+					var embed discordgo.MessageEmbed
+					embed.Type = "rich"
+					embed.Title = "Image Results for \"" + set.Query + "\""
+
+					fmt.Printf("Index before: %d\n", set.Index)
+					if m.Emoji.Name == "⬅️" {
+						if set.Index != 0 {
+							set.Index--
+						}
+					} else if m.Emoji.Name == "➡️" {
+						if set.Index != len(set.Images)-1 {
+							set.Index++
+						}
+					}
+					fmt.Printf("Index after: %d\n", set.Index)
+
+					var image discordgo.MessageEmbedImage
+					image.URL = set.Images[set.Index]
+					embed.Image = &image
+					var footer discordgo.MessageEmbedFooter
+					footer.Text = fmt.Sprintf("Image %d of %d", set.Index+1, len(set.Images))
+					footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
+					embed.Footer = &footer
+					s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
+					s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
+				}
+			}
+		}
 	}
 }

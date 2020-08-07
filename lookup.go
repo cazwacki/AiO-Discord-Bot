@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
+	"google.golang.org/api/customsearch/v1"
+	"google.golang.org/api/googleapi/transport"
 )
 
 type GoogleResult struct {
@@ -20,6 +23,13 @@ type Term struct {
 	Usage      string
 	Definition string
 	Example    string
+}
+
+type ImageSet struct {
+	Query     string
+	MessageID string
+	Images    []string
+	Index     int
 }
 
 /**
@@ -113,6 +123,30 @@ func fetchDefinitions(query string) []Term {
 	return terms
 }
 
+func fetch_image(query string, index int) ImageSet {
+	fmt.Println("Query: '" + query + "'")
+	var newset ImageSet
+	client := &http.Client{Transport: &transport.APIKey{Key: os.Getenv("GOOGLE_API_KEY")}}
+
+	svc, err := customsearch.New(client)
+	if err != nil {
+		fmt.Println(err)
+		return newset
+	}
+
+	resp, err := svc.Cse.List().Cx("007244931007990492385:f42b7zsrt0k").SearchType("image").Q(query).Do()
+	if err != nil {
+		fmt.Println(err)
+		return newset
+	}
+
+	for _, result := range resp.Items {
+		newset.Images = append(newset.Images, result.Link)
+	}
+
+	return newset
+}
+
 /**
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
@@ -167,27 +201,57 @@ func Handle_google(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 
 	if len(results) == 0 {
 		s.ChannelMessageSend(m.ChannelID, "Unable to fetch Google results. Try again later :frowning:")
-	} else {
-		// construct embed response
-		var embed discordgo.MessageEmbed
-		embed.URL = fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", url.QueryEscape(strings.Join(command[2:], " ")))
-		embed.Type = "rich"
-		embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
-		resultString := ""
-		for i, result := range results {
-			resultString += fmt.Sprintf("%d: [%s](%s)\n", (i + 1), result.ResultTitle, result.ResultURL)
-		}
-		embed.Description = resultString
-		var footer discordgo.MessageEmbedFooter
-		footer.Text = "First " + strconv.Itoa(len(results)) + " results from Google Search Engine"
-		footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
-		embed.Footer = &footer
-		// send response
-		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		return
 	}
+	// construct embed response
+	var embed discordgo.MessageEmbed
+	embed.URL = fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", url.QueryEscape(strings.Join(command[2:], " ")))
+	embed.Type = "rich"
+	embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
+	resultString := ""
+	for i, result := range results {
+		resultString += fmt.Sprintf("%d: [%s](%s)\n", (i + 1), result.ResultTitle, result.ResultURL)
+	}
+	embed.Description = resultString
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "First " + strconv.Itoa(len(results)) + " results from Google Search Engine"
+	footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
+	embed.Footer = &footer
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 }
 
 func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
+		return
+	}
+	result := fetch_image(strings.Join(command[1:], " "), 0)
+	if len(result.Images) == 0 {
+		s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
+		return
+	}
+	// craft response and send
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "Image Results for \"" + strings.Join(command[1:], " ") + "\""
+	var image discordgo.MessageEmbedImage
+	image.URL = result.Images[0]
+	embed.Image = &image
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = fmt.Sprintf("Image 1 of %d", len(result.Images))
+	footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
+	embed.Footer = &footer
+	message, _ := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
+	result.Query = strings.Join(command[1:], " ")
+	result.MessageID = message.ID
+	result.Index = 0
+	appendToGlobalImageSet(result)
+
+	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⬅️")
+	s.MessageReactionAdd(m.ChannelID, result.MessageID, "➡️")
+	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⏹️")
 
 }
 
@@ -197,35 +261,4 @@ func createCommand(title string, description string) *discordgo.MessageEmbedFiel
 	command.Value = description
 	command.Inline = false
 	return &command
-}
-
-func Handle_help(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// return all current commands and what they do
-	var embed discordgo.MessageEmbed
-	embed.Type = "rich"
-	embed.Title = "How to use ZawackiBot"
-	var thumbnail discordgo.MessageEmbedThumbnail
-	thumbnail.URL = "https://static.thenounproject.com/png/1248-200.png"
-	embed.Thumbnail = &thumbnail
-	var commands []*discordgo.MessageEmbedField
-	commands = append(commands, createCommand("~uptime", "Reports the bot's current uptime."))
-	commands = append(commands, createCommand("~shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart."))
-	commands = append(commands, createCommand("~nick @user <nickname>", "Renames the specified user to the provided nickname."))
-	commands = append(commands, createCommand("~kick @user (reason: optional)", "Kicks the specified user from the server."))
-	commands = append(commands, createCommand("~ban @user (reason:optional)", "Bans the specified user from the server."))
-	commands = append(commands, createCommand("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk."))
-	commands = append(commands, createCommand("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki."))
-	commands = append(commands, createCommand("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted."))
-	commands = append(commands, createCommand("~define <word/phrase>", "Returns a definition of the word/phrase if it is available."))
-	commands = append(commands, createCommand("~google <word/phrase>", "Returns the first five google results returned from the query."))
-	commands = append(commands, createCommand("~image <word/phrase>", "Returns the first image from Google Images."))
-	commands = append(commands, createCommand("~help", "Returns how to use each of the commands the bot has available."))
-	embed.Fields = commands
-	var footer discordgo.MessageEmbedFooter
-	footer.Text = "Created by Charles Zawacki; Written in Go"
-	footer.IconURL = "https://avatars0.githubusercontent.com/u/44577941?s=460&u=4eb7b9ff5410be189eea9863c33916c805dbd2b2&v=4"
-	embed.Footer = &footer
-	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-
 }
