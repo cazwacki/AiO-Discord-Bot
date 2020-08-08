@@ -48,9 +48,9 @@ func TestDBD(t *testing.T) {
 	})
 
 	t.Run("~autoshrine actually changes the file", func(t *testing.T) {
-		set_new_channel("739852388264968243")
+		set_new_channel("731158169174409216")
 		currentChannel, _ := ioutil.ReadFile("./autoshrine_channel")
-		if string(currentChannel) != "739852388264968243" {
+		if string(currentChannel) != "731158169174409216" {
 			t.Logf("Failed to change autoshrine channel; " + string(currentChannel))
 			t.Fail()
 		}
