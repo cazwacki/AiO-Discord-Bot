@@ -102,7 +102,7 @@ func fetchDefinitions(query string) []Term {
 /**
 Uses Google CustomSearch API to generate and return 10 images.
 */
-func fetch_image(query string) ImageSet {
+func fetchImage(query string) ImageSet {
 	fmt.Println("Query: '" + query + "'")
 	var newset ImageSet
 	client := &http.Client{Transport: &transport.APIKey{Key: os.Getenv("GOOGLE_API_KEY")}}
@@ -132,7 +132,7 @@ func fetch_image(query string) ImageSet {
 /**
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
-func Handle_define(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
 	} else {
@@ -173,7 +173,7 @@ func Handle_define(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 /**
 Sends the first five search results for the query input by the user
 */
-func Handle_google(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~google <word / phrase>`")
 		return
@@ -207,12 +207,12 @@ func Handle_google(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 Creates and populates an ImageSet to be added to the globalImageSet. Sends the image
 to the channel with emotes that can be used to scroll between images.
 */
-func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
 		return
 	}
-	result := fetch_image(strings.Join(command[1:], " "))
+	result := fetchImage(strings.Join(command[1:], " "))
 	if len(result.Images) == 0 {
 		s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
 		return

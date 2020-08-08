@@ -32,7 +32,7 @@ Helper function for Handle_perk and should be used before scrape_perk.
 Formats the perk provided in the command such that it can be used as
 the end of the URL query to https://deadbydaylight.gamepedia.com/.
 */
-func format_perk(command []string) string {
+func formatPerk(command []string) string {
 	specialWords := " in the of for from "
 	for i := 1; i < len(command); i++ {
 		if strings.Contains(specialWords, command[i]) {
@@ -54,7 +54,7 @@ Helper function for Handle_perk. Scrapes HTML from the respective
 page on https://deadbydaylight.gamepedia.com/ and returns the
 desired information in the Perk struct created above.
 */
-func scrape_perk(perk string) Perk {
+func scrapePerk(perk string) Perk {
 	var resultingPerk Perk
 
 	resultingPerk.PageURL = "https://deadbydaylight.gamepedia.com/" + perk
@@ -104,7 +104,7 @@ Helper function for Handle_perk. Scrapes HTML from the shrine
 page on https://deadbydaylight.gamepedia.com/ and returns the
 desired information in the Shrine struct created above.
 */
-func scrape_shrine() Shrine {
+func scrapeShrine() Shrine {
 	var resultingShrine Shrine
 	// Request the HTML page.
 	doc := loadPage("https://deadbydaylight.gamepedia.com/Shrine_of_Secrets")
@@ -142,13 +142,13 @@ func scrape_shrine() Shrine {
 Fetches perk information from https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki
 and displays the gif icon as well as the perk's source (if there is one) and what it does.
 **/
-func Handle_perk(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~perk <perk name>`")
 		return
 	}
-	requestedPerkString := format_perk(command)
-	perk := scrape_perk(requestedPerkString)
+	requestedPerkString := formatPerk(command)
+	perk := scrapePerk(requestedPerkString)
 	fmt.Printf("%+v\n", perk)
 
 	// create and send response
@@ -175,8 +175,8 @@ func Handle_perk(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 Checks https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki for the most recent shrine
 post and outputs its information.
 **/
-func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
-	shrine := scrape_shrine()
+func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate) {
+	shrine := scrapeShrine()
 	fmt.Printf("%+v\n", shrine)
 
 	// create and send response
@@ -208,7 +208,7 @@ func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
 When a new shrine tweet is received, construct a message and post it to the designated
 autoshrine channel.
 */
-func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
+func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
 	if strings.HasPrefix(v.Text, "This week's shrine is:") {
 		// construct embed response
 		var embed discordgo.MessageEmbed
@@ -226,7 +226,7 @@ func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
 
 		buf, err := ioutil.ReadFile("./autoshrine_channel")
 		if err != nil {
-			Handle_tweet(s, v)
+			handleTweet(s, v)
 			return
 		}
 
@@ -238,7 +238,7 @@ func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
 /**
 Helper function for Handle_autoshrine. Writes the new channel to file.
 */
-func set_new_channel(channel string) bool {
+func setNewChannel(channel string) bool {
 	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0644)
 	if err != nil {
 		return false
@@ -249,13 +249,13 @@ func set_new_channel(channel string) bool {
 /**
 Switches the channel that the tweet monitoring system will output to.
 **/
-func Handle_autoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 2 {
 		if strings.HasPrefix(command[1], "<#") {
 			// remove formatting
 			channel := strings.ReplaceAll(command[1], "<#", "")
 			channel = strings.ReplaceAll(channel, ">", "")
-			if set_new_channel(channel) {
+			if setNewChannel(channel) {
 				s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
 			} else {
 				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")

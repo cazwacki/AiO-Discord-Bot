@@ -11,7 +11,7 @@ at github.com/bwmarrin/discordgo
 **/
 func TestLookups(t *testing.T) {
 	t.Run("~image scrapes 10 images correctly", func(t *testing.T) {
-		imageSet := fetch_image("gecko")
+		imageSet := fetchImage("gecko")
 		if imageSet.Query != "gecko" {
 			t.Logf("Failed to populate query correctly: %s", imageSet.Query)
 			t.Fail()

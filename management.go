@@ -14,7 +14,7 @@ import (
 Used to validate a user's permissions before moving forward with a command. Prevents command abuse.
 If the user has administrator permissions, just automatically allow them to perform any bot command.
 **/
-func user_has_valid_permissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int) bool {
+func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int) bool {
 	perms, err := s.UserChannelPermissions(m.Author.ID, m.ChannelID)
 	if err != nil {
 		fmt.Println(err)
@@ -46,7 +46,7 @@ func dmUser(s *discordgo.Session, m *discordgo.MessageCreate, userID string, mes
 A helper function for Handle_nick. Ensures the user targeted a user using @; if they did,
 attempt to rename the specified user.
 **/
-func attempt_rename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func attemptRename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if regex.MatchString(command[1]) && len(command) > 2 {
 		userID := strings.TrimSuffix(command[1], ">")
@@ -68,7 +68,7 @@ func attempt_rename(s *discordgo.Session, m *discordgo.MessageCreate, command []
 A helper function for Handle_kick. Ensures the user targeted a user using @; if they did,
 attempt to kick the specified user.
 **/
-func attempt_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
@@ -100,7 +100,7 @@ func attempt_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 A helper function for Handle_ban. Ensures the user targeted a user using @; if they did,
 attempt to ban the specified user.
 **/
-func attempt_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
@@ -131,14 +131,14 @@ func attempt_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 /**
 Outputs the bot's current uptime.
 **/
-func Handle_uptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
+func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
 	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start).Truncate(time.Second/10).String())
 }
 
 /**
 Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
 **/
-func Handle_shutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
 	s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
 	s.Close()
 	os.Exit(0)
@@ -148,8 +148,8 @@ func Handle_shutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
 Generates an invite code to the channel in which ~invite was invoked if the user has the
 permission to create instant invites.
 **/
-func Handle_invite(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if user_has_valid_permissions(s, m, discordgo.PermissionCreateInstantInvite) {
+func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate) {
+	if userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		var invite discordgo.Invite
 		invite.Temporary = false
 		invite.MaxAge = 21600 // 6 hours
@@ -170,13 +170,13 @@ func Handle_invite(s *discordgo.Session, m *discordgo.MessageCreate) {
 Nicknames the user if they target themselves, or nicknames a target user if the user who invoked
 ~nick has the permission to change nicknames.
 **/
-func Handle_nickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if user_has_valid_permissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID) {
+func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID) {
 		// see if user is trying to self-nickname
-		attempt_rename(s, m, command)
-	} else if user_has_valid_permissions(s, m, discordgo.PermissionManageNicknames) {
+		attemptRename(s, m, command)
+	} else if userHasValidPermissions(s, m, discordgo.PermissionManageNicknames) {
 		// validate caller has permission to nickname other users
-		attempt_rename(s, m, command)
+		attemptRename(s, m, command)
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to change nicknames.")
 	}
@@ -185,10 +185,10 @@ func Handle_nickname(s *discordgo.Session, m *discordgo.MessageCreate, command [
 /**
 Kicks a user from the server if the invoking user has the permission to kick users.
 **/
-func Handle_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if user_has_valid_permissions(s, m, discordgo.PermissionKickMembers) {
+func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
-		attempt_kick(s, m, command)
+		attemptKick(s, m, command)
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to kick users.")
 	}
@@ -197,10 +197,10 @@ func Handle_kick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 /**
 Bans a user from the server if the invoking user has the permission to ban users.
 **/
-func Handle_ban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if user_has_valid_permissions(s, m, discordgo.PermissionBanMembers) {
+func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
 		// validate caller has permission to kick other users
-		attempt_ban(s, m, command)
+		attemptBan(s, m, command)
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to ban users.")
 	}

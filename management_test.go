@@ -22,7 +22,7 @@ at github.com/bwmarrin/discordgo
 **/
 func TestMessageResponse(t *testing.T) {
 	// main bot
-	go Run_bot(os.Getenv("BOT_TOKEN"))
+	go runBot(os.Getenv("BOT_TOKEN"))
 	time.Sleep(2 * time.Second) // give bot time to start
 
 	// test bot

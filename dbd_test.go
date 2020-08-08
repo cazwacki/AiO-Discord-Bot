@@ -13,7 +13,7 @@ at github.com/bwmarrin/discordgo
 **/
 func TestDBD(t *testing.T) {
 	t.Run("Shrine scrapes correctly", func(t *testing.T) {
-		shrine := scrape_shrine()
+		shrine := scrapeShrine()
 		perkCount := 4
 		if len(shrine.Perks) != perkCount || len(shrine.Prices) != perkCount || len(shrine.Owners) != perkCount {
 			t.Logf("Failed to pull the expected %d perks", perkCount)
@@ -28,7 +28,7 @@ func TestDBD(t *testing.T) {
 	// just using one perk. this will fail if the design scheme for perks
 	// the website changes significantly.
 	t.Run("Perks scrape correctly", func(t *testing.T) {
-		perk := scrape_perk("Lithe")
+		perk := scrapePerk("Lithe")
 		if perk.PageURL != "https://deadbydaylight.gamepedia.com/Lithe" {
 			t.Logf("Failed to pull from correct URL")
 			t.Fail()
@@ -48,7 +48,7 @@ func TestDBD(t *testing.T) {
 	})
 
 	t.Run("~autoshrine actually changes the file", func(t *testing.T) {
-		set_new_channel("731158169174409216")
+		setNewChannel("731158169174409216")
 		currentChannel, _ := ioutil.ReadFile("./autoshrine_channel")
 		if string(currentChannel) != "731158169174409216" {
 			t.Logf("Failed to change autoshrine channel; " + string(currentChannel))

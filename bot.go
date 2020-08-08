@@ -23,7 +23,7 @@ func appendToGlobalImageSet(newset ImageSet) {
 	fmt.Println(globalImageSet)
 }
 
-func Run_bot(token string) {
+func runBot(token string) {
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
@@ -50,7 +50,7 @@ func Run_bot(token string) {
 	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
 	anaconda.SetConsumerSecret(os.Getenv("TWITTER_API_SECRET"))
 	api := anaconda.NewTwitterApi(os.Getenv("TWITTER_TOKEN"), os.Getenv("TWITTER_TOKEN_SECRET"))
-	go run_twitter_loop(api, dg)
+	go runTwitterLoop(api, dg)
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -67,7 +67,7 @@ func Run_bot(token string) {
 Opens a stream looking for new tweets from @DeadbyBHVR, who posts the weekly
 shrine on Twitter.
 */
-func run_twitter_loop(api *anaconda.TwitterApi, dg *discordgo.Session) {
+func runTwitterLoop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	fmt.Println("Starting...")
 	v := url.Values{}
 	v.Set("follow", "4850837842") // @DeadbyBHVR is 4850837842
@@ -76,12 +76,12 @@ func run_twitter_loop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	for t := range s.C {
 		switch v := t.(type) {
 		case anaconda.Tweet:
-			Handle_tweet(dg, v)
+			handleTweet(dg, v)
 		}
 	}
 }
 
-func Handle_help(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// return all current commands and what they do
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
@@ -147,34 +147,34 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	switch parsedCommand[0] {
 	case "~help":
-		go Handle_help(s, m)
+		go handleHelp(s, m)
 	// management commands
 	case "~uptime":
-		go Handle_uptime(s, m, start)
+		go handleUptime(s, m, start)
 	case "~shutdown":
-		go Handle_shutdown(s, m)
+		go handleShutdown(s, m)
 	case "~invite":
-		go Handle_invite(s, m)
+		go handleInvite(s, m)
 	case "~nick":
-		go Handle_nickname(s, m, parsedCommand)
+		go handleNickname(s, m, parsedCommand)
 	case "~kick":
-		go Handle_kick(s, m, parsedCommand)
+		go handleKick(s, m, parsedCommand)
 	case "~ban":
-		go Handle_ban(s, m, parsedCommand)
+		go handleBan(s, m, parsedCommand)
 	// dbd commands
 	case "~perk":
-		go Handle_perk(s, m, parsedCommand)
+		go handlePerk(s, m, parsedCommand)
 	case "~shrine":
-		go Handle_shrine(s, m)
+		go handleShrine(s, m)
 	case "~autoshrine":
-		go Handle_autoshrine(s, m, parsedCommand)
+		go handleAutoshrine(s, m, parsedCommand)
 	// lookup commands
 	case "~define":
-		go Handle_define(s, m, parsedCommand)
+		go handleDefine(s, m, parsedCommand)
 	case "~google":
-		go Handle_google(s, m, parsedCommand)
+		go handleGoogle(s, m, parsedCommand)
 	case "~image":
-		go Handle_image(s, m, parsedCommand)
+		go handleImage(s, m, parsedCommand)
 	}
 }
 
