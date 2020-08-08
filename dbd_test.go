@@ -11,7 +11,7 @@ Test anything that uses calculation outside of the discordgo commands.
 Those commands don't need to be tested since they are verified to work
 at github.com/bwmarrin/discordgo
 **/
-func TestScraping(t *testing.T) {
+func TestDBD(t *testing.T) {
 	t.Run("Shrine scrapes correctly", func(t *testing.T) {
 		shrine := scrape_shrine()
 		perkCount := 4

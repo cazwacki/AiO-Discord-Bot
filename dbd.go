@@ -291,7 +291,7 @@ func Handle_tweet(s *discordgo.Session, v anaconda.Tweet) {
 Helper function for Handle_autoshrine. Writes the new channel to file.
 */
 func set_new_channel(channel string) bool {
-	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0755)
+	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0644)
 	if err != nil {
 		return false
 	}
