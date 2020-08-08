@@ -12,6 +12,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// Perk : contains information about the perk pulled from the wiki
 type Perk struct {
 	Name        string
 	IconURL     string
@@ -20,6 +21,7 @@ type Perk struct {
 	PageURL     string
 }
 
+// Shrine : contains information about the current shrine pulled from the wiki
 type Shrine struct {
 	Prices         []string
 	Perks          []string

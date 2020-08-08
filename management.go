@@ -23,9 +23,8 @@ func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, p
 	}
 	if perms|permission == perms || perms|discordgo.PermissionAdministrator == perms {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 /**
@@ -154,12 +153,12 @@ func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate) {
 		invite.Temporary = false
 		invite.MaxAge = 21600 // 6 hours
 		invite.MaxUses = 0    // infinite uses
-		invite_result, err := s.ChannelInviteCreate(m.ChannelID, invite)
+		inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Error creating invite. Try again in a moment.")
 			fmt.Println(err)
 		} else {
-			s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+invite_result.Code)
+			s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+inviteResult.Code)
 		}
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to create an instant invite.")
