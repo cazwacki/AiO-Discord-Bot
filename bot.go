@@ -135,7 +135,7 @@ commands.forEach() {
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore my testing channel
-	if prod_mode && m.ChannelID == "739852388264968243" {
+	if prodMode && m.ChannelID == "739852388264968243" {
 		return
 	}
 	// Ignore all messages created by the bot itself as well as DMs
