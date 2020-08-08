@@ -14,17 +14,20 @@ import (
 	"google.golang.org/api/googleapi/transport"
 )
 
+// GoogleResult : holds a result's title and link
 type GoogleResult struct {
 	ResultURL   string
 	ResultTitle string
 }
 
+// Term : holds a definition set for a word
 type Term struct {
 	Usage      string
 	Definition string
 	Example    string
 }
 
+// ImageSet : holds 10 images and the associated message of an image query
 type ImageSet struct {
 	Query     string
 	MessageID string

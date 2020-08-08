@@ -1,3 +1,5 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/cazwacki/PersonalDiscordBot)](https://goreportcard.com/report/github.com/cazwacki/PersonalDiscordBot) [![Build Status](https://travis-ci.org/cazwacki/PersonalDiscordBot.svg?branch=master)](https://travis-ci.org/cazwacki/PersonalDiscordBot)
+
 # PersonalDiscordBot
 Bot for my discord server hooked up to a CI/CD system and developed in Go.
 
