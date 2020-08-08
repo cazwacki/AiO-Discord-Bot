@@ -123,7 +123,7 @@ func fetchDefinitions(query string) []Term {
 	return terms
 }
 
-func fetch_image(query string, index int) ImageSet {
+func fetch_image(query string) ImageSet {
 	fmt.Println("Query: '" + query + "'")
 	var newset ImageSet
 	client := &http.Client{Transport: &transport.APIKey{Key: os.Getenv("GOOGLE_API_KEY")}}
@@ -143,6 +143,9 @@ func fetch_image(query string, index int) ImageSet {
 	for _, result := range resp.Items {
 		newset.Images = append(newset.Images, result.Link)
 	}
+
+	newset.Query = query
+	newset.Index = 0
 
 	return newset
 }
@@ -226,7 +229,7 @@ func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
 		return
 	}
-	result := fetch_image(strings.Join(command[1:], " "), 0)
+	result := fetch_image(strings.Join(command[1:], " "))
 	if len(result.Images) == 0 {
 		s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
 		return
@@ -244,9 +247,7 @@ func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Footer = &footer
 	message, _ := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 
-	result.Query = strings.Join(command[1:], " ")
 	result.MessageID = message.ID
-	result.Index = 0
 	appendToGlobalImageSet(result)
 
 	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⬅️")
