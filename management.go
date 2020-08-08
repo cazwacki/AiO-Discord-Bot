@@ -151,7 +151,7 @@ permission to create instant invites.
 func Handle_invite(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if user_has_valid_permissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		var invite discordgo.Invite
-		invite.Temporary = true
+		invite.Temporary = false
 		invite.MaxAge = 21600 // 6 hours
 		invite.MaxUses = 0    // infinite uses
 		invite_result, err := s.ChannelInviteCreate(m.ChannelID, invite)

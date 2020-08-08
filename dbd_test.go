@@ -29,10 +29,6 @@ func TestDBD(t *testing.T) {
 	// the website changes significantly.
 	t.Run("Perks scrape correctly", func(t *testing.T) {
 		perk := scrape_perk("Lithe")
-		if perk.HTTPResponse != 200 {
-			t.Logf("Failed to pull perk that we know exists")
-			t.Fail()
-		}
 		if perk.PageURL != "https://deadbydaylight.gamepedia.com/Lithe" {
 			t.Logf("Failed to pull from correct URL")
 			t.Fail()

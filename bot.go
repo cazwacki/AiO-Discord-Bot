@@ -90,19 +90,19 @@ func Handle_help(s *discordgo.Session, m *discordgo.MessageCreate) {
 	thumbnail.URL = "https://static.thenounproject.com/png/1248-200.png"
 	embed.Thumbnail = &thumbnail
 	var commands []*discordgo.MessageEmbedField
-	commands = append(commands, createCommand("~uptime", "Reports the bot's current uptime."))
-	commands = append(commands, createCommand("~shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart."))
-	commands = append(commands, createCommand("~invite", "Generates a server invitation valid for 24 hours."))
-	commands = append(commands, createCommand("~nick @user <nickname>", "Renames the specified user to the provided nickname."))
-	commands = append(commands, createCommand("~kick @user (reason: optional)", "Kicks the specified user from the server."))
-	commands = append(commands, createCommand("~ban @user (reason:optional)", "Bans the specified user from the server."))
-	commands = append(commands, createCommand("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk."))
-	commands = append(commands, createCommand("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki."))
-	commands = append(commands, createCommand("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted."))
-	commands = append(commands, createCommand("~define <word/phrase>", "Returns a definition of the word/phrase if it is available."))
-	commands = append(commands, createCommand("~google <word/phrase>", "Returns the first five google results returned from the query."))
-	commands = append(commands, createCommand("~image <word/phrase>", "Returns the first image from Google Images."))
-	commands = append(commands, createCommand("~help", "Returns how to use each of the commands the bot has available."))
+	commands = append(commands, createField("~uptime", "Reports the bot's current uptime.", false))
+	commands = append(commands, createField("~shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", false))
+	commands = append(commands, createField("~invite", "Generates a server invitation valid for 24 hours.", false))
+	commands = append(commands, createField("~nick @user <nickname>", "Renames the specified user to the provided nickname.", false))
+	commands = append(commands, createField("~kick @user (reason: optional)", "Kicks the specified user from the server.", false))
+	commands = append(commands, createField("~ban @user (reason:optional)", "Bans the specified user from the server.", false))
+	commands = append(commands, createField("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", false))
+	commands = append(commands, createField("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", false))
+	commands = append(commands, createField("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", false))
+	commands = append(commands, createField("~define <word/phrase>", "Returns a definition of the word/phrase if it is available.", false))
+	commands = append(commands, createField("~google <word/phrase>", "Returns the first five google results returned from the query.", false))
+	commands = append(commands, createField("~image <word/phrase>", "Returns the first image from Google Images.", false))
+	commands = append(commands, createField("~help", "Returns how to use each of the commands the bot has available.", false))
 	embed.Fields = commands
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "Created by Charles Zawacki; Written in Go"
@@ -179,7 +179,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 }
 
 /**
-Used to handle scrolling through images given from ~image.
+Used to handle scrolling through images given from ~image,
+but can and may be used to handle other reactions
 */
 func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	// Ignore all messages created by the bot itself as well as DMs

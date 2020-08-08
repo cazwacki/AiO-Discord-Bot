@@ -40,21 +40,9 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 
 	// Request the HTML page.
 	query = url.QueryEscape(query)
-	res, err := http.Get(fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", query))
-	if err != nil {
-		fmt.Println("Error getting the page.")
-		fmt.Println(err)
-		return results
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		fmt.Println("Page did not return 200 status OK")
-		return results
-	}
+	doc := loadPage(fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", query))
 
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
+	if doc == nil {
 		return results
 	}
 
@@ -86,21 +74,9 @@ func fetchDefinitions(query string) []Term {
 	terms := []Term{}
 
 	fmt.Println("Query: `" + query + "`")
-	res, err := http.Get(fmt.Sprintf("https://dictionary.cambridge.org/us/dictionary/english/%s", query))
-	if err != nil {
-		fmt.Println("Error getting the page.")
-		fmt.Println(err)
-		return terms
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		fmt.Println("Page did not return 200 status OK")
-		return terms
-	}
+	doc := loadPage(fmt.Sprintf("https://dictionary.cambridge.org/us/dictionary/english/%s", query))
 
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
+	if doc == nil {
 		return terms
 	}
 
@@ -123,6 +99,9 @@ func fetchDefinitions(query string) []Term {
 	return terms
 }
 
+/**
+Uses Google CustomSearch API to generate and return 10 images.
+*/
 func fetch_image(query string) ImageSet {
 	fmt.Println("Query: '" + query + "'")
 	var newset ImageSet
@@ -224,6 +203,10 @@ func Handle_google(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 }
 
+/**
+Creates and populates an ImageSet to be added to the globalImageSet. Sends the image
+to the channel with emotes that can be used to scroll between images.
+*/
 func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
@@ -254,12 +237,4 @@ func Handle_image(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	s.MessageReactionAdd(m.ChannelID, result.MessageID, "➡️")
 	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⏹️")
 
-}
-
-func createCommand(title string, description string) *discordgo.MessageEmbedField {
-	var command discordgo.MessageEmbedField
-	command.Name = title
-	command.Value = description
-	command.Inline = false
-	return &command
 }

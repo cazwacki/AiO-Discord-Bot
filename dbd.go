@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strings"
 	"unicode"
@@ -14,12 +13,11 @@ import (
 )
 
 type Perk struct {
-	Name         string
-	IconURL      string
-	Description  string
-	Quote        string
-	PageURL      string
-	HTTPResponse int
+	Name        string
+	IconURL     string
+	Description string
+	Quote       string
+	PageURL     string
 }
 
 type Shrine struct {
@@ -27,7 +25,6 @@ type Shrine struct {
 	Perks          []string
 	Owners         []string
 	TimeUntilReset string
-	HTTPResponse   int
 }
 
 /**
@@ -62,38 +59,12 @@ func scrape_perk(perk string) Perk {
 
 	resultingPerk.PageURL = "https://deadbydaylight.gamepedia.com/" + perk
 
-	/********************************
-	   GET THE HTML DOCUMENT FIRST
-	********************************/
 	// Request the HTML page.
-	res, err := http.Get(resultingPerk.PageURL)
-	if err != nil {
-		fmt.Println("Error getting the page.")
-		fmt.Println(err)
-		resultingPerk.HTTPResponse = 404
+	doc := loadPage(resultingPerk.PageURL)
+
+	if doc == nil {
 		return resultingPerk
 	}
-	defer res.Body.Close()
-	resultingPerk.HTTPResponse = res.StatusCode
-	if resultingPerk.HTTPResponse != 200 {
-		fmt.Println("Page did not return 200 status OK")
-		// try the hex page
-		if strings.HasPrefix(perk, "Hex:_") {
-			return resultingPerk
-		}
-		return scrape_perk("Hex:_" + perk)
-	}
-
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		return resultingPerk
-	}
-
-	/********************************
-	   GET THE PERK INFO FROM THE
-	         DOCUMENT BODY
-	********************************/
 
 	/** Get Perk Name **/
 	docName := doc.Find(".firstHeading").First()
@@ -136,22 +107,9 @@ desired information in the Shrine struct created above.
 func scrape_shrine() Shrine {
 	var resultingShrine Shrine
 	// Request the HTML page.
-	res, err := http.Get("https://deadbydaylight.gamepedia.com/Shrine_of_Secrets")
-	if err != nil {
-		fmt.Println("Error getting the page.")
-		fmt.Println(err)
-		return resultingShrine
-	}
-	defer res.Body.Close()
-	resultingShrine.HTTPResponse = res.StatusCode
-	if resultingShrine.HTTPResponse != 200 {
-		fmt.Println("Page did not return 200 status OK")
-		return resultingShrine
-	}
+	doc := loadPage("https://deadbydaylight.gamepedia.com/Shrine_of_Secrets")
 
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
+	if doc == nil {
 		return resultingShrine
 	}
 
@@ -194,10 +152,10 @@ func Handle_perk(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	fmt.Printf("%+v\n", perk)
 
 	// create and send response
-	if perk.HTTPResponse != 200 {
+	if perk.Name == "" {
 		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that perk :frowning:")
 	} else {
-		// construct complex message
+		// construct embed message
 		var embed discordgo.MessageEmbed
 		embed.URL = perk.PageURL
 		embed.Type = "rich"
@@ -222,7 +180,7 @@ func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
 	fmt.Printf("%+v\n", shrine)
 
 	// create and send response
-	if shrine.HTTPResponse != 200 {
+	if len(shrine.Prices) == 0 {
 		s.ChannelMessageSend(m.ChannelID, "Sorry! I wasn't able to get the shrine :frowning:")
 	} else {
 		fmt.Println("Here's the shrine!")
@@ -232,19 +190,9 @@ func Handle_shrine(s *discordgo.Session, m *discordgo.MessageCreate) {
 		embed.Type = "rich"
 		embed.Title = "Current Shrine"
 		var fields []*discordgo.MessageEmbedField
-		var perks discordgo.MessageEmbedField
-		perks.Name = "Perk"
-		perks.Value = shrine.Perks[0] + "\n" + shrine.Perks[1] + "\n" + shrine.Perks[2] + "\n" + shrine.Perks[3]
-		perks.Inline = true
-		var costs discordgo.MessageEmbedField
-		costs.Name = "Price"
-		costs.Value = shrine.Prices[0] + "\n" + shrine.Prices[1] + "\n" + shrine.Prices[2] + "\n" + shrine.Prices[3]
-		costs.Inline = true
-		var owners discordgo.MessageEmbedField
-		owners.Name = "Unique to"
-		owners.Value = shrine.Owners[0] + "\n" + shrine.Owners[1] + "\n" + shrine.Owners[2] + "\n" + shrine.Owners[3]
-		owners.Inline = true
-		fields = append(fields, &perks, &costs, &owners)
+		fields = append(fields, createField("Perk", shrine.Perks[0]+"\n"+shrine.Perks[1]+"\n"+shrine.Perks[2]+"\n"+shrine.Perks[3], true))
+		fields = append(fields, createField("Price", shrine.Prices[0]+"\n"+shrine.Prices[1]+"\n"+shrine.Prices[2]+"\n"+shrine.Prices[3], true))
+		fields = append(fields, createField("Unique to", shrine.Owners[0]+"\n"+shrine.Owners[1]+"\n"+shrine.Owners[2]+"\n"+shrine.Owners[3], true))
 		embed.Fields = fields
 		var footer discordgo.MessageEmbedFooter
 		footer.Text = shrine.TimeUntilReset
