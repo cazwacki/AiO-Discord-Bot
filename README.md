@@ -11,7 +11,7 @@ Bot for my discord server hooked up to a CI/CD system and developed in Go.
 - [x] ~ban @user (reason: optional): Ban the specified user from the server.
 - [x] ~uptime: Reports the bot's current uptime.
 - [x] ~shutdown: Shuts down the bot. Note that if the bot is deployed on a webservice like Heroku, it will probably immediately restart by design.
-- [ ]  ~purge <number>: Removes the <number> most recent commands.
+- [x]  ~purge <number>: Removes the <number> most recent commands.
   
 ### Dead By Daylight Commands
 - [x] ~perk <perk name>: Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
