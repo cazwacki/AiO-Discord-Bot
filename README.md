@@ -1,7 +1,22 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cazwacki/PersonalDiscordBot)](https://goreportcard.com/report/github.com/cazwacki/PersonalDiscordBot) [![Build Status](https://travis-ci.org/cazwacki/PersonalDiscordBot.svg?branch=master)](https://travis-ci.org/cazwacki/PersonalDiscordBot)
 
 # PersonalDiscordBot
-Bot for my discord server hooked up to a CI/CD system and developed in Go.
+Bot for my Discord server hooked up to a CI/CD system and developed in Go. It utilizes web scraping to get some of its information.
+
+## Setup
+1. If your environment does not have Go, [install it from here.](https://golang.org/dl/)
+2. Clone/download this code.
+3. [Create a bot on the Discord Developer Portal](https://discord.com/developers) and save its token.
+4. [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
+5. [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
+6. Set the following information as environment variables on the system you are deploying the bot:
+   - BOT_TOKEN
+   - TWITTER_API_KEY
+   - TWITTER_API_SECRET
+   - TWITTER_TOKEN
+   - TWITTER_TOKEN_SECRET
+   - GOOGLE_API_KEY
+7. Call `go run .` to invoke the bot.
 
 ## Commands
 
