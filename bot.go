@@ -96,6 +96,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	commands = append(commands, createField("~nick @user <nickname>", "Renames the specified user to the provided nickname.", false))
 	commands = append(commands, createField("~kick @user (reason: optional)", "Kicks the specified user from the server.", false))
 	commands = append(commands, createField("~ban @user (reason:optional)", "Bans the specified user from the server.", false))
+	commands = append(commands, createField("~purge <number>", "Removes the <number> most recent messages from the channel.", false))
 	commands = append(commands, createField("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", false))
 	commands = append(commands, createField("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", false))
 	commands = append(commands, createField("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", false))
@@ -161,6 +162,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		go handleKick(s, m, parsedCommand)
 	case "~ban":
 		go handleBan(s, m, parsedCommand)
+	case "~purge":
+		go handlePurge(s, m, parsedCommand)
 	// dbd commands
 	case "~perk":
 		go handlePerk(s, m, parsedCommand)
