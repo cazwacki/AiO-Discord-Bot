@@ -6,22 +6,22 @@ Bot for my discord server hooked up to a CI/CD system and developed in Go.
 ## Commands
 
 ### Standard / Management
-- [x] ~nick @user <new username>: If you have the permissions, nickname the specified user on the server.
+- [x] ~nick @user (new username): If you have the permissions, nickname the specified user on the server.
 - [x] ~kick @user (reason: optional): Kick the specified user from the server.
 - [x] ~ban @user (reason: optional): Ban the specified user from the server.
 - [x] ~uptime: Reports the bot's current uptime.
 - [x] ~shutdown: Shuts down the bot. Note that if the bot is deployed on a webservice like Heroku, it will probably immediately restart by design.
-- [x]  ~purge <number>: Removes the <number> most recent commands.
+- [x]  ~purge (number): Removes the (number) most recent commands.
   
 ### Dead By Daylight Commands
-- [x] ~perk <perk name>: Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
+- [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
 - [x] ~shrine: Scrapes the current Shrine of Secrets from https://deadbydaylight.gamepedia.com/.
-- [x] ~autoshrine <#channel>: Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.
+- [x] ~autoshrine (#channel): Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.
   
 ### Lookup Commands
-- [x] ~define <word / phrase>: Returns a definition of the word / phrase if it is available.
-- [x] ~google <word / phrase>: Returns the first five results from Google Search Engine.
-- [x] ~image <word / phrase>: Returns the first image from Google Search Engine
+- [x] ~define (word / phrase): Returns a definition of the word / phrase if it is available.
+- [x] ~google (word / phrase): Returns the first five results from Google Search Engine.
+- [x] ~image (word / phrase): Returns the first image from Google Search Engine
 - [x] ~help: Returns how to use each of the commands the bot has available.
 
 ## Things I Have Learned
