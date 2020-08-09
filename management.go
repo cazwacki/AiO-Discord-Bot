@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,6 +129,39 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 }
 
 /**
+Attempts to purge the last <number> messages, then removes the purge command.
+*/
+func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 2 {
+		messageCount, err := strconv.Atoi(command[1])
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+			return
+		}
+		if messageCount > 100 || messageCount < 1 {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you can only purge 1-100 messages. Try again.")
+			return
+		}
+		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+			return
+		}
+
+		var messageIDs []string
+		for _, message := range messages {
+			messageIDs = append(messageIDs, message.ID)
+		}
+
+		s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+		time.Sleep(time.Second)
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+	}
+}
+
+/**
 Outputs the bot's current uptime.
 **/
 func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
@@ -202,5 +236,16 @@ func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []strin
 		attemptBan(s, m, command)
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to ban users.")
+	}
+}
+
+/**
+Removes the <number> most recent messages from the channel where the command was called.
+**/
+func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
+		attemptPurge(s, m, command)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to remove messages.")
 	}
 }
