@@ -190,7 +190,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	}
 	// construct embed response
 	var embed discordgo.MessageEmbed
-	embed.URL = fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", url.QueryEscape(strings.Join(command[2:], " ")))
+	embed.URL = fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", url.QueryEscape(strings.Join(command[1:], " ")))
 	embed.Type = "rich"
 	embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
 	resultString := ""
