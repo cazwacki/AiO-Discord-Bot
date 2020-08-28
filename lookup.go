@@ -54,7 +54,7 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 		if len(results) < resultCount {
 			resultTitle := s.Find("h3").Text()
 			resultUrl := s.Find("a").AttrOr("href", "nil")
-			resultUrl = strings.TrimPrefix(resultUrl, "/url?q=")
+			resultUrl = strings.Split(strings.TrimPrefix(resultUrl, "/url?q="), "&")[0]
 			if resultUrl != "nil" && resultTitle != "" {
 				result := GoogleResult{
 					resultUrl,
@@ -197,6 +197,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
 	resultString := ""
 	for i, result := range results {
+		fmt.Printf("result.ResultURL = %s\n", result.ResultURL)
 		resultString += fmt.Sprintf("%d: [%s](%s)\n", (i + 1), result.ResultTitle, result.ResultURL)
 	}
 	embed.Description = resultString
