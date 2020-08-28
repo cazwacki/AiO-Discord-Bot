@@ -151,15 +151,17 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
 			var fields []*discordgo.MessageEmbedField
 			for _, term := range terms {
-				var field discordgo.MessageEmbedField
-				field.Name = term.Usage
-				value := term.Definition + "\n"
-				if term.Example != "" {
-					value += "`" + term.Example + "`"
+				if term.Usage != "" && term.Definition != "" {
+					var field discordgo.MessageEmbedField
+					field.Name = term.Usage
+					value := term.Definition + "\n"
+					if term.Example != "" {
+						value += "`" + term.Example + "`"
+					}
+					field.Value = value
+					field.Inline = false
+					fields = append(fields, &field)
 				}
-				field.Value = value
-				field.Inline = false
-				fields = append(fields, &field)
 			}
 			embed.Fields = fields
 			var footer discordgo.MessageEmbedFooter
