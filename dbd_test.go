@@ -33,7 +33,7 @@ func TestDBD(t *testing.T) {
 			t.Logf("Failed to pull from correct URL")
 			t.Fail()
 		}
-		if strings.HasPrefix(perk.IconURL, "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/8/8d/Lithe.gif/") == false {
+		if strings.Contains(perk.IconURL, "Lithe.gif") == false {
 			t.Logf("Failed to pull correct icon")
 			t.Fail()
 		}

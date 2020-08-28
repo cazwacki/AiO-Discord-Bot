@@ -54,7 +54,7 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 		if len(results) < resultCount {
 			resultTitle := s.Find("h3").Text()
 			resultUrl := s.Find("a").AttrOr("href", "nil")
-			resultUrl = strings.TrimPrefix(resultUrl, "/url?q=")
+			resultUrl = strings.Split(strings.TrimPrefix(resultUrl, "/url?q="), "&")[0]
 			if resultUrl != "nil" && resultTitle != "" {
 				result := GoogleResult{
 					resultUrl,
@@ -151,15 +151,17 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
 			var fields []*discordgo.MessageEmbedField
 			for _, term := range terms {
-				var field discordgo.MessageEmbedField
-				field.Name = term.Usage
-				value := term.Definition + "\n"
-				if term.Example != "" {
-					value += "`" + term.Example + "`"
+				if term.Usage != "" && term.Definition != "" {
+					var field discordgo.MessageEmbedField
+					field.Name = term.Usage
+					value := term.Definition + "\n"
+					if term.Example != "" {
+						value += "`" + term.Example + "`"
+					}
+					field.Value = value
+					field.Inline = false
+					fields = append(fields, &field)
 				}
-				field.Value = value
-				field.Inline = false
-				fields = append(fields, &field)
 			}
 			embed.Fields = fields
 			var footer discordgo.MessageEmbedFooter
@@ -195,6 +197,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
 	resultString := ""
 	for i, result := range results {
+		fmt.Printf("result.ResultURL = %s\n", result.ResultURL)
 		resultString += fmt.Sprintf("%d: [%s](%s)\n", (i + 1), result.ResultTitle, result.ResultURL)
 	}
 	embed.Description = resultString
