@@ -162,6 +162,110 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 }
 
 /**
+Attempts to copy over the last <number> messages to the given channel, then outputs its success
+*/
+func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string, preserveMessages bool) {
+	if len(command) == 3 {
+		messageCount, err := strconv.Atoi(command[1])
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			return
+		}
+		if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			return
+		}
+		channel := strings.ReplaceAll(command[2], "<#", "")
+		channel = strings.ReplaceAll(channel, ">", "")
+		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Usage: Ran into an error retrieving messages. :slight_frown:")
+			return
+		}
+		// construct an embed for each message
+		for index := range messages {
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+			message := messages[len(messages)-1-index]
+			if !preserveMessages {
+				err := s.ChannelMessageDelete(m.ChannelID, message.ID)
+				if err != nil {
+					fmt.Println(err)
+				}
+			}
+			if message.Author != nil {
+				member, err := s.GuildMember(m.GuildID, message.Author.ID)
+				nickname := ""
+				if err == nil {
+					nickname = member.Nick
+				} else {
+					fmt.Println(err)
+				}
+				embed.Title = ""
+				if nickname != "" {
+					embed.Title += nickname + " ("
+				}
+				embed.Title += message.Author.Username + "#" + message.Author.Discriminator
+				if nickname != "" {
+					embed.Title += ")"
+				}
+				var thumbnail discordgo.MessageEmbedThumbnail
+				thumbnail.URL = message.Author.AvatarURL("")
+				embed.Thumbnail = &thumbnail
+			}
+			embed.Timestamp = string(message.Timestamp)
+			var contents []*discordgo.MessageEmbedField
+			// output message text
+			if message.Content != "" {
+				embed.Description = "- \"" + message.Content + "\""
+			}
+			// output attachments
+			if len(message.Attachments) > 0 {
+				for _, attachment := range message.Attachments {
+					contents = append(contents, createField("Attachment: "+attachment.Filename, attachment.ProxyURL, false))
+				}
+			}
+			// output embed contents (up to 10... jesus christ...)
+			if len(message.Embeds) > 0 {
+				for _, embed := range message.Embeds {
+					contents = append(contents, createField("Embed Title", embed.Title, false))
+					contents = append(contents, createField("Embed Text", embed.Description, false))
+					if embed.Image != nil {
+						contents = append(contents, createField("Embed Image", embed.Image.ProxyURL, false))
+					}
+					if embed.Thumbnail != nil {
+						contents = append(contents, createField("Embed Thumbnail", embed.Thumbnail.ProxyURL, false))
+					}
+					if embed.Video != nil {
+						contents = append(contents, createField("Embed Video", embed.Video.URL, false))
+					}
+					if embed.Footer != nil {
+						contents = append(contents, createField("Embed Footer", embed.Footer.Text, false))
+					}
+				}
+			}
+			// ouput reactions on a message
+			if len(message.Reactions) > 0 {
+				reactionText := ""
+				for index, reactionSet := range message.Reactions {
+					reactionText += reactionSet.Emoji.Name + " x" + strconv.Itoa(reactionSet.Count)
+					if index < len(message.Reactions)-1 {
+						reactionText += ", "
+					}
+				}
+				contents = append(contents, createField("Reactions", reactionText, false))
+			}
+			embed.Fields = contents
+			// send response
+			s.ChannelMessageSendEmbed(channel, &embed)
+		}
+		s.ChannelMessageSend(m.ChannelID, "Copied "+strconv.Itoa(messageCount)+" messages from <#"+m.ChannelID+"> to <#"+channel+">! :smile:")
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+	}
+}
+
+/**
 Outputs the bot's current uptime.
 **/
 func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
@@ -247,5 +351,25 @@ func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		attemptPurge(s, m, command)
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to remove messages.")
+	}
+}
+
+/**
+Copies the <number> most recent messages from the channel where the command was called and
+pastes it in the requested channel.
+**/
+func handleCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
+		attemptCopy(s, m, command, true)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
+	}
+}
+
+func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
+		attemptCopy(s, m, command, false)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
 	}
 }
