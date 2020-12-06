@@ -366,6 +366,9 @@ func handleCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	}
 }
 
+/**
+Same as above, but purges each message it copies
+**/
 func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		attemptCopy(s, m, command, false)
