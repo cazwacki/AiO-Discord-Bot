@@ -104,6 +104,8 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 	commands = append(commands, createField("~google <word/phrase>", "Returns the first five google results returned from the query.", false))
 	commands = append(commands, createField("~image <word/phrase>", "Returns the first image from Google Images.", false))
 	commands = append(commands, createField("~help", "Returns how to use each of the commands the bot has available.", false))
+	commands = append(commands, createField("~mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", false))
+	commands = append(commands, createField("~cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", false))
 	embed.Fields = commands
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "Created by Charles Zawacki; Written in Go"
@@ -164,6 +166,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		go handleBan(s, m, parsedCommand)
 	case "~purge":
 		go handlePurge(s, m, parsedCommand)
+	case "~mv":
+		go handleMove(s, m, parsedCommand)
+	case "~cp":
+		go handleCopy(s, m, parsedCommand)
 	// dbd commands
 	case "~perk":
 		go handlePerk(s, m, parsedCommand)
