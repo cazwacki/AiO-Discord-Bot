@@ -265,6 +265,48 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	}
 }
 
+func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 2 {
+		if strings.HasPrefix(command[1], "<@!") && strings.HasSuffix(command[1], ">") {
+			userID := strings.TrimSuffix(command[1], ">")
+			userID = strings.TrimPrefix(userID, "<@!")
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+
+			user, err := s.User(userID)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
+			}
+
+			member, err := s.GuildMember(m.GuildID, userID)
+			nickname := ""
+			if err == nil {
+				nickname = member.Nick
+			} else {
+				fmt.Println(err)
+			}
+			embed.Title = "Profile Picture for "
+			if nickname != "" {
+				embed.Title += nickname + " ("
+			}
+			embed.Title += user.Username + "#" + user.Discriminator
+			if nickname != "" {
+				embed.Title += ")"
+			}
+
+			var image discordgo.MessageEmbedImage
+			image.URL = user.AvatarURL("512")
+			embed.Image = &image
+
+			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
+		}
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
+	}
+}
+
 /**
 Outputs the bot's current uptime.
 **/
@@ -375,4 +417,8 @@ func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
 	}
+}
+
+func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	attemptProfile(s, m, command)
 }
