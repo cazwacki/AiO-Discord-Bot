@@ -3,6 +3,8 @@
 # PersonalDiscordBot
 Bot for my Discord server hooked up to a CI/CD system and developed in Go. It utilizes web scraping to get some of its information.
 
+UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay $70/mo. for a pet project.
+
 ## Setup
 1. If your environment does not have Go, [install it from here.](https://golang.org/dl/)
 2. Clone/download this code.
