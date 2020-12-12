@@ -138,22 +138,35 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
 			return
 		}
-		if messageCount > 100 || messageCount < 1 {
-			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you can only purge 1-100 messages. Try again.")
-			return
+		if messageCount < 1 {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
 		}
-		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
-		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
-			return
-		}
+		for messageCount > 0 {
+			messagesToPurge := 0
+			// can only purge 100 messages per invocation
+			if messageCount > 100 {
+				messagesToPurge = 100
+			} else {
+				messagesToPurge = messageCount
+			}
 
-		var messageIDs []string
-		for _, message := range messages {
-			messageIDs = append(messageIDs, message.ID)
-		}
+			// get the last (messagesToPurge) messages from the channel
+			messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+				return
+			}
 
-		s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+			// get the message IDs
+			var messageIDs []string
+			for _, message := range messages {
+				messageIDs = append(messageIDs, message.ID)
+			}
+
+			// delete all the marked messages
+			s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+			messageCount -= messagesToPurge
+		}
 		time.Sleep(time.Second)
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
 	} else {
@@ -177,28 +190,37 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
+
+		// verify correctly invoking channel
 		if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
 		channel := strings.ReplaceAll(command[2], "<#", "")
 		channel = strings.ReplaceAll(channel, ">", "")
+
+		// retrieve messages from current invoked channel
 		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Usage: Ran into an error retrieving messages. :slight_frown:")
 			return
 		}
+
 		// construct an embed for each message
 		for index := range messages {
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 			message := messages[len(messages)-1-index]
+
+			// remove messages if calling mv command
 			if !preserveMessages {
 				err := s.ChannelMessageDelete(m.ChannelID, message.ID)
 				if err != nil {
 					fmt.Println(err)
 				}
 			}
+
+			// populating author information in the embed
 			if message.Author != nil {
 				member, err := s.GuildMember(m.GuildID, message.Author.ID)
 				nickname := ""
@@ -219,18 +241,23 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				thumbnail.URL = message.Author.AvatarURL("")
 				embed.Thumbnail = &thumbnail
 			}
+
+			// preserve message timestamp
 			embed.Timestamp = string(message.Timestamp)
 			var contents []*discordgo.MessageEmbedField
+
 			// output message text
 			if message.Content != "" {
 				embed.Description = "- \"" + message.Content + "\""
 			}
+
 			// output attachments
 			if len(message.Attachments) > 0 {
 				for _, attachment := range message.Attachments {
 					contents = append(contents, createField("Attachment: "+attachment.Filename, attachment.ProxyURL, false))
 				}
 			}
+
 			// output embed contents (up to 10... jesus christ...)
 			if len(message.Embeds) > 0 {
 				for _, embed := range message.Embeds {
@@ -250,6 +277,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					}
 				}
 			}
+
 			// ouput reactions on a message
 			if len(message.Reactions) > 0 {
 				reactionText := ""
@@ -262,6 +290,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				contents = append(contents, createField("Reactions", reactionText, false))
 			}
 			embed.Fields = contents
+
 			// send response
 			s.ChannelMessageSendEmbed(channel, &embed)
 		}
@@ -271,19 +300,26 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	}
 }
 
+/**
+Helper function for handleProfile. Attempts to retrieve a user's avatar and return it
+in an embed.
+*/
 func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 2 {
+		// verify correctly tagging a user
 		if strings.HasPrefix(command[1], "<@!") && strings.HasSuffix(command[1], ">") {
 			userID := strings.TrimSuffix(command[1], ">")
 			userID = strings.TrimPrefix(userID, "<@!")
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 
+			// get user
 			user, err := s.User(userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
 			}
 
+			// get member data from the user
 			member, err := s.GuildMember(m.GuildID, userID)
 			nickname := ""
 			if err == nil {
@@ -291,6 +327,8 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			} else {
 				fmt.Println(err)
 			}
+
+			// title the embed
 			embed.Title = "Profile Picture for "
 			if nickname != "" {
 				embed.Title += nickname + " ("
@@ -300,6 +338,7 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 				embed.Title += ")"
 			}
 
+			// attach the user's avatar as 512x512 image
 			var image discordgo.MessageEmbedImage
 			image.URL = user.AvatarURL("512")
 			embed.Image = &image
@@ -430,6 +469,9 @@ func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	}
 }
 
+/**
+Creates an embed showing a user's profile as a bigger image so it is more visible.
+*/
 func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	attemptProfile(s, m, command)
 }
