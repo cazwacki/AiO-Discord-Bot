@@ -177,7 +177,7 @@ func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 Checks https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki for the most recent shrine
 post and outputs its information.
 **/
-func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	shrine := scrapeShrine()
 	fmt.Printf("%+v\n", shrine)
 

@@ -310,14 +310,19 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 /**
 Outputs the bot's current uptime.
 **/
-func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
-	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start).Truncate(time.Second/10).String())
+func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start []string) {
+	fmt.Println(start[0])
+	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", start[0])
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error parsing the date... :frowning:")
+	}
+	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start_time).Truncate(time.Second/10).String())
 }
 
 /**
 Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
 **/
-func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
 	s.Close()
 	os.Exit(0)
@@ -327,7 +332,7 @@ func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
 Generates an invite code to the channel in which ~invite was invoked if the user has the
 permission to create instant invites.
 **/
-func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		var invite discordgo.Invite
 		invite.Temporary = false
