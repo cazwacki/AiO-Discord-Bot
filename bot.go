@@ -117,6 +117,9 @@ func runTwitterLoop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	}
 }
 
+/**
+Creates an embed displaying all the potential commands and their functions.
+*/
 func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	// return all current commands and what they do
 	var embed discordgo.MessageEmbed
