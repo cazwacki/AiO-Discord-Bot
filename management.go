@@ -165,14 +165,20 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 Attempts to copy over the last <number> messages to the given channel, then outputs its success
 */
 func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string, preserveMessages bool) {
+	var commandInvoked string
+	if preserveMessages {
+		commandInvoked = "cp"
+	} else {
+		commandInvoked = "mv"
+	}
 	if len(command) == 3 {
 		messageCount, err := strconv.Atoi(command[1])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
 		if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
 		channel := strings.ReplaceAll(command[2], "<#", "")
@@ -261,7 +267,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		}
 		s.ChannelMessageSend(m.ChannelID, "Copied "+strconv.Itoa(messageCount)+" messages from <#"+m.ChannelID+"> to <#"+channel+">! :smile:")
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 	}
 }
 

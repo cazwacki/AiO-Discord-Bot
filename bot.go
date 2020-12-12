@@ -33,7 +33,9 @@ func appendToGlobalImageSet(newset ImageSet) {
 	fmt.Println(globalImageSet)
 }
 
-// COMMAND LISTING SECTION
+/**
+Initialize command information and prefix
+*/
 func initCommandInfo() {
 	prefix = "~"
 	commandList = map[string]command{
@@ -58,22 +60,24 @@ func initCommandInfo() {
 }
 
 func runBot(token string) {
-
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prodMode = true
 	}
 	start = time.Now()
 
+	// initialize bot
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		fmt.Println("Error creating discord session")
 		return
 	}
 
+	// add listeners
 	dg.AddHandler(messageCreate)
 	dg.AddHandler(messageReactionAdd)
 
+	// open connection to discord
 	err = dg.Open()
 	if err != nil {
 		fmt.Println("Error opening connection,", err)
@@ -124,20 +128,28 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	// return all current commands and what they do
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
+
 	embed.Title = "How to use ZawackiBot"
+
+	// add a cute thumbnail
 	var thumbnail discordgo.MessageEmbedThumbnail
-	thumbnail.URL = "https://static.thenounproject.com/png/1248-200.png"
+	thumbnail.URL = "https://img.pngio.com/robot-icon-of-flat-style-available-in-svg-png-eps-ai-icon-robot-icon-png-256_256.png"
 	embed.Thumbnail = &thumbnail
+
+	// add all commands to the embed as a set of fields that are not inline
 	var commands []*discordgo.MessageEmbedField
 	for _, command := range commandList {
 		invoke_word := strings.Split(command.invoke_format, " ")[0]
 		commands = append(commands, createField(prefix+invoke_word, command.description, false))
 	}
 	embed.Fields = commands
+
+	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "Created by Charles Zawacki; Written in Go"
 	footer.IconURL = "https://avatars0.githubusercontent.com/u/44577941?s=460&u=4eb7b9ff5410be189eea9863c33916c805dbd2b2&v=4"
 	embed.Footer = &footer
+
 	// send response
 	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 
@@ -158,9 +170,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	parsedCommand := strings.Split(m.Content, " ")
-
 	invoke_word := strings.TrimPrefix(parsedCommand[0], prefix)
 
+	// get the command information based on the invoke word
 	if validCommand, ok := commandList[invoke_word]; ok {
 		// special case: needs to pass in starting time
 		if parsedCommand[0] == prefix+"uptime" {
