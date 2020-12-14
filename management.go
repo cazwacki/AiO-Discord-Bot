@@ -266,8 +266,10 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 }
 
 func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	fmt.Println(command)
 	if len(command) == 2 {
-		if strings.HasPrefix(command[1], "<@!") && strings.HasSuffix(command[1], ">") {
+		regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
+		if regex.MatchString(command[1]) {
 			userID := strings.TrimSuffix(command[1], ">")
 			userID = strings.TrimPrefix(userID, "<@!")
 			var embed discordgo.MessageEmbed
