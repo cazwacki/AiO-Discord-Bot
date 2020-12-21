@@ -47,10 +47,11 @@ A helper function for Handle_nick. Ensures the user targeted a user using @; if 
 attempt to rename the specified user.
 **/
 func attemptRename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if regex.MatchString(command[1]) && len(command) > 2 {
 		userID := strings.TrimSuffix(command[1], ">")
-		userID = strings.TrimPrefix(userID, "<@!")
+		userID = strings.TrimPrefix(userID, "<@")
+		userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 		err := s.GuildMemberNickname(m.GuildID, userID, strings.Join(command[2:], " "))
 		if err == nil {
 			s.ChannelMessageSend(m.ChannelID, "Done!")
@@ -69,11 +70,12 @@ A helper function for Handle_kick. Ensures the user targeted a user using @; if 
 attempt to kick the specified user.
 **/
 func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
 			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@!")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 			if len(command) > 2 {
 				// dm user why they were kicked
 				reason := strings.Join(command[2:], " ")
@@ -101,11 +103,12 @@ A helper function for Handle_ban. Ensures the user targeted a user using @; if t
 attempt to ban the specified user.
 **/
 func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	regex := regexp.MustCompile(`^\<\@\![0-9]+\>$`)
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
 			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@!")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 			if len(command) > 2 {
 				// dm user why they were banned
 				reason := strings.Join(command[2:], " ")
@@ -305,11 +308,13 @@ Helper function for handleProfile. Attempts to retrieve a user's avatar and retu
 in an embed.
 */
 func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	fmt.Println(command)
 	if len(command) == 2 {
-		// verify correctly tagging a user
-		if strings.HasPrefix(command[1], "<@!") && strings.HasSuffix(command[1], ">") {
+		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+		if regex.MatchString(command[1]) {
 			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@!")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 
