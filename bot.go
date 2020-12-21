@@ -56,6 +56,7 @@ func initCommandInfo() {
 		"shrine":     {"shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", handleShrine},
 		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
 		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
+		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
 	}
 }
 
@@ -137,9 +138,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	embed.Thumbnail = &thumbnail
 
 	// add all commands to the embed as a set of fields that are not inline
-	var commands []*discordgo.MessageEmbedField
-	commands = append(commands, createField("Command List", "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot/tree/code_improvements#commands) "+"for this bot now!", false))
-	embed.Fields = commands
+	embed.Description = "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot/tree/code_improvements#commands) for this bot now!"
 
 	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
