@@ -38,12 +38,12 @@ func TestLookups(t *testing.T) {
 
 	t.Run("~define returns a valid definition", func(t *testing.T) {
 		terms := fetchDefinitions("test")
-		if len(terms) == 0 {
-			t.Logf("Failed to find usages for word we know exists, found %d results", len(terms))
+		if len(terms.Entries) == 0 {
+			t.Logf("Failed to find usages for word we know exists, found %d results", len(terms.Entries))
 			t.Fail()
 		}
-		for _, term := range terms {
-			if term.Usage == "" || term.Definition == "" {
+		for _, term := range terms.Entries {
+			if len(term.Definitions) == 0 {
 				t.Logf("Failed to populate usage and definition correctly %+v", term)
 				t.Fail()
 			}
