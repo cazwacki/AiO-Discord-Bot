@@ -154,43 +154,46 @@ Defines a word using the Cambridge dictionary and sends the definition back to t
 func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
-	} else {
-		query := url.QueryEscape(strings.Join(command[1:], "-"))
-		terms := fetchDefinitions(query)
+		return
+	}
 
-		if len(terms.Entries) == 0 {
-			s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
-		} else {
-			var embed discordgo.MessageEmbed
-			embed.Type = "rich"
-			embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
-			var fields []*discordgo.MessageEmbedField
-			for _, entry := range terms.Entries {
-				for _, definition := range entry.Definitions {
-					var field discordgo.MessageEmbedField
-					field.Name = definition.PartOfSpeech + " "
-					field.Value = ""
-					for index, sense := range definition.Senses {
-						labels := ""
-						if len(sense.Labels) != 0 {
-							labels += "(" + strings.Join(sense.Labels, ", ") + ")"
-						}
-						field.Value += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
-					}
-					field.Inline = false
-					fields = append(fields, &field)
+	query := url.QueryEscape(strings.Join(command[1:], "-"))
+	terms := fetchDefinitions(query)
+
+	if len(terms.Entries) == 0 {
+		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
+		return
+	}
+
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
+	var fields []*discordgo.MessageEmbedField
+	for _, entry := range terms.Entries {
+		for _, definition := range entry.Definitions {
+			var field discordgo.MessageEmbedField
+			field.Name = definition.PartOfSpeech + " "
+			field.Value = ""
+			for index, sense := range definition.Senses {
+				labels := ""
+				if len(sense.Labels) != 0 {
+					labels += "(" + strings.Join(sense.Labels, ", ") + ")"
 				}
+				field.Value += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
 			}
-			embed.Fields = fields
-			var footer discordgo.MessageEmbedFooter
-			footer.Text = "Fetched from Wiktionary"
-			footer.IconURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/WiktionaryEn_-_DP_Derivative.svg/1200px-WiktionaryEn_-_DP_Derivative.svg.png"
-			embed.Footer = &footer
-
-			// send response
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			field.Inline = false
+			fields = append(fields, &field)
 		}
 	}
+	embed.Fields = fields
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "Fetched from Wiktionary"
+	footer.IconURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/WiktionaryEn_-_DP_Derivative.svg/1200px-WiktionaryEn_-_DP_Derivative.svg.png"
+	embed.Footer = &footer
+
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
 }
 
 /**

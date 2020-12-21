@@ -129,7 +129,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 
-	embed.Title = "How to use ZawackiBot"
+	embed.Title = "❓ How to Use ZawackiBot ❓"
 
 	// add a cute thumbnail
 	var thumbnail discordgo.MessageEmbedThumbnail
@@ -138,10 +138,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 
 	// add all commands to the embed as a set of fields that are not inline
 	var commands []*discordgo.MessageEmbedField
-	for _, command := range commandList {
-		invoke_word := strings.Split(command.invoke_format, " ")[0]
-		commands = append(commands, createField(prefix+invoke_word, command.description, false))
-	}
+	commands = append(commands, createField("Command List", "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot/tree/code_improvements#commands) "+"for this bot now!", false))
 	embed.Fields = commands
 
 	// self-credit + github profile picture

@@ -156,21 +156,21 @@ func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	// create and send response
 	if perk.Name == "" {
 		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that perk :frowning:")
-	} else {
-		// construct embed message
-		var embed discordgo.MessageEmbed
-		embed.URL = perk.PageURL
-		embed.Type = "rich"
-		embed.Title = perk.Name
-		embed.Description = perk.Description
-		var thumbnail discordgo.MessageEmbedThumbnail
-		thumbnail.URL = perk.IconURL
-		embed.Thumbnail = &thumbnail
-		var footer discordgo.MessageEmbedFooter
-		footer.Text = perk.Quote
-		embed.Footer = &footer
-		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		return
 	}
+	// construct embed message
+	var embed discordgo.MessageEmbed
+	embed.URL = perk.PageURL
+	embed.Type = "rich"
+	embed.Title = perk.Name
+	embed.Description = perk.Description
+	var thumbnail discordgo.MessageEmbedThumbnail
+	thumbnail.URL = perk.IconURL
+	embed.Thumbnail = &thumbnail
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = perk.Quote
+	embed.Footer = &footer
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 }
 
 /**
@@ -184,26 +184,28 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	// create and send response
 	if len(shrine.Prices) == 0 {
 		s.ChannelMessageSend(m.ChannelID, "Sorry! I wasn't able to get the shrine :frowning:")
-	} else {
-		fmt.Println("Here's the shrine!")
-		// construct embed response
-		var embed discordgo.MessageEmbed
-		embed.URL = "https://deadbydaylight.gamepedia.com/Shrine_of_Secrets#Current_Shrine_of_Secrets"
-		embed.Type = "rich"
-		embed.Title = "Current Shrine"
-		var fields []*discordgo.MessageEmbedField
-		fields = append(fields, createField("Perk", shrine.Perks[0]+"\n"+shrine.Perks[1]+"\n"+shrine.Perks[2]+"\n"+shrine.Perks[3], true))
-		fields = append(fields, createField("Price", shrine.Prices[0]+"\n"+shrine.Prices[1]+"\n"+shrine.Prices[2]+"\n"+shrine.Prices[3], true))
-		fields = append(fields, createField("Unique to", shrine.Owners[0]+"\n"+shrine.Owners[1]+"\n"+shrine.Owners[2]+"\n"+shrine.Owners[3], true))
-		embed.Fields = fields
-		var footer discordgo.MessageEmbedFooter
-		footer.Text = shrine.TimeUntilReset
-		footer.IconURL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
-		embed.Footer = &footer
-
-		// send response
-		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		return
 	}
+
+	fmt.Println("Here's the shrine!")
+	// construct embed response
+	var embed discordgo.MessageEmbed
+	embed.URL = "https://deadbydaylight.gamepedia.com/Shrine_of_Secrets#Current_Shrine_of_Secrets"
+	embed.Type = "rich"
+	embed.Title = "Current Shrine"
+	var fields []*discordgo.MessageEmbedField
+	fields = append(fields, createField("Perk", shrine.Perks[0]+"\n"+shrine.Perks[1]+"\n"+shrine.Perks[2]+"\n"+shrine.Perks[3], true))
+	fields = append(fields, createField("Price", shrine.Prices[0]+"\n"+shrine.Prices[1]+"\n"+shrine.Prices[2]+"\n"+shrine.Prices[3], true))
+	fields = append(fields, createField("Unique to", shrine.Owners[0]+"\n"+shrine.Owners[1]+"\n"+shrine.Owners[2]+"\n"+shrine.Owners[3], true))
+	embed.Fields = fields
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = shrine.TimeUntilReset
+	footer.IconURL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
+	embed.Footer = &footer
+
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
 }
 
 /**
@@ -252,20 +254,20 @@ func setNewChannel(channel string) bool {
 Switches the channel that the tweet monitoring system will output to.
 **/
 func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if len(command) == 2 {
-		if strings.HasPrefix(command[1], "<#") {
-			// remove formatting
-			channel := strings.ReplaceAll(command[1], "<#", "")
-			channel = strings.ReplaceAll(channel, ">", "")
-			if setNewChannel(channel) {
-				s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
-			} else {
-				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
-			}
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
-		}
-	} else {
+	if len(command) != 2 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+		return
+	}
+	if !strings.HasPrefix(command[1], "<#") {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+		return
+	}
+	// remove formatting
+	channel := strings.ReplaceAll(command[1], "<#", "")
+	channel = strings.ReplaceAll(channel, ">", "")
+	if setNewChannel(channel) {
+		s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+	} else {
+		s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
 	}
 }
