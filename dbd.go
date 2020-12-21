@@ -228,6 +228,7 @@ func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
 		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
 		embed.Thumbnail = &thumbnail
 
+		// attempt to read channel identity from file
 		buf, err := ioutil.ReadFile("./autoshrine_channel")
 		if err != nil {
 			handleTweet(s, v)
@@ -254,14 +255,18 @@ func setNewChannel(channel string) bool {
 Switches the channel that the tweet monitoring system will output to.
 **/
 func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// correct usage of autoshrine?
 	if len(command) != 2 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
 		return
 	}
+
+	// is the second field a channel?
 	if !strings.HasPrefix(command[1], "<#") {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
 		return
 	}
+
 	// remove formatting
 	channel := strings.ReplaceAll(command[1], "<#", "")
 	channel = strings.ReplaceAll(channel, ">", "")

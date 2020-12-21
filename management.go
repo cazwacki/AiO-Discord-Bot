@@ -383,20 +383,20 @@ Generates an invite code to the channel in which ~invite was invoked if the user
 permission to create instant invites.
 **/
 func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
-		var invite discordgo.Invite
-		invite.Temporary = false
-		invite.MaxAge = 21600 // 6 hours
-		invite.MaxUses = 0    // infinite uses
-		inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
-		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Error creating invite. Try again in a moment.")
-			fmt.Println(err)
-		} else {
-			s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+inviteResult.Code)
-		}
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to create an instant invite.")
+		return
+	}
+	var invite discordgo.Invite
+	invite.Temporary = false
+	invite.MaxAge = 21600 // 6 hours
+	invite.MaxUses = 0    // infinite uses
+	inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error creating invite. Try again in a moment.")
+		fmt.Println(err)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+inviteResult.Code)
 	}
 }
 
@@ -405,50 +405,44 @@ Nicknames the user if they target themselves, or nicknames a target user if the 
 ~nick has the permission to change nicknames.
 **/
 func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID) {
-		// see if user is trying to self-nickname
-		attemptRename(s, m, command)
-	} else if userHasValidPermissions(s, m, discordgo.PermissionManageNicknames) {
-		// validate caller has permission to nickname other users
-		attemptRename(s, m, command)
-	} else {
+	if !(userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID)) && !(userHasValidPermissions(s, m, discordgo.PermissionManageNicknames)) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to change nicknames.")
 	}
+	attemptRename(s, m, command)
 }
 
 /**
 Kicks a user from the server if the invoking user has the permission to kick users.
 **/
 func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
-		attemptKick(s, m, command)
-	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to kick users.")
 	}
+	attemptKick(s, m, command)
 }
 
 /**
 Bans a user from the server if the invoking user has the permission to ban users.
 **/
 func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
 		// validate caller has permission to kick other users
-		attemptBan(s, m, command)
-	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to ban users.")
+		return
 	}
+	attemptBan(s, m, command)
 }
 
 /**
 Removes the <number> most recent messages from the channel where the command was called.
 **/
 func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptPurge(s, m, command)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to remove messages.")
+		return
 	}
+	attemptPurge(s, m, command)
 }
 
 /**
@@ -456,22 +450,22 @@ Copies the <number> most recent messages from the channel where the command was 
 pastes it in the requested channel.
 **/
 func handleCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptCopy(s, m, command, true)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
+		return
 	}
+	attemptCopy(s, m, command, true)
 }
 
 /**
 Same as above, but purges each message it copies
 **/
 func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptCopy(s, m, command, false)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
+		return
 	}
+	attemptCopy(s, m, command, false)
 }
 
 /**

@@ -91,6 +91,7 @@ an array of Entries.
 func fetchDefinitions(query string) DictResults {
 	var definitions DictResults
 
+	// fetch response from lingua robot API
 	url := "https://lingua-robot.p.rapidapi.com/language/v1/entries/en/" + query
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -113,6 +114,7 @@ func fetchDefinitions(query string) DictResults {
 		return definitions
 	}
 
+	// load json response into definitions struct
 	json.Unmarshal(body, &definitions)
 
 	return definitions
@@ -152,6 +154,7 @@ func fetchImage(query string) ImageSet {
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
 func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// was the command invoked correctly?
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
 		return
@@ -160,11 +163,13 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	query := url.QueryEscape(strings.Join(command[1:], "-"))
 	terms := fetchDefinitions(query)
 
+	// did the API return any definition?
 	if len(terms.Entries) == 0 {
 		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
 		return
 	}
 
+	// construct embed response
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 	embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
