@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,17 +16,31 @@ import (
 	"google.golang.org/api/googleapi/transport"
 )
 
+// JSON Unmarshaling for Lingua Bot
+type DictResults struct {
+	Entries []Entry `json:"entries"`
+}
+
+type Entry struct {
+	Term        string   `json:"entry"`
+	Definitions []Lexeme `json:"lexemes,omitempty"`
+	SourceURLs  []string `json:"sourceUrls,omitempty"`
+}
+
+type Lexeme struct {
+	PartOfSpeech string  `json:"partOfSpeech"`
+	Senses       []Sense `json:"senses,omitempty"`
+}
+
+type Sense struct {
+	Definition string   `json:"definition"`
+	Labels     []string `json:"labels,omitempty"`
+}
+
 // GoogleResult : holds a result's title and link
 type GoogleResult struct {
 	ResultURL   string
 	ResultTitle string
-}
-
-// Term : holds a definition set for a word
-type Term struct {
-	Usage      string
-	Definition string
-	Example    string
 }
 
 // ImageSet : holds 10 images and the associated message of an image query
@@ -69,37 +85,39 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 }
 
 /**
-Pulls definitions from the Cambridge dictionary and returns it as
-an array of Terms.
+Pulls definitions from the Lingua Bot API and returns it as
+an array of Entries.
 */
-func fetchDefinitions(query string) []Term {
-	// Request the HTML page.
-	terms := []Term{}
+func fetchDefinitions(query string) DictResults {
+	var definitions DictResults
 
-	fmt.Println("Query: `" + query + "`")
-	doc := loadPage(fmt.Sprintf("https://dictionary.cambridge.org/us/dictionary/english/%s", query))
+	// fetch response from lingua robot API
+	url := "https://lingua-robot.p.rapidapi.com/language/v1/entries/en/" + query
 
-	if doc == nil {
-		return terms
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return definitions
 	}
 
-	// int index
-	doc.Find("div.entry-body__el").Each(func(i int, s1 *goquery.Selection) {
-		// get usage:
-		usage := strings.Split(s1.Find("div.posgram.dpos-g.hdib.lmr-5").First().Text(), " ")[0]
-		definition := s1.Find("div.def.ddef_d.db").First().Text()
-		example := s1.Find("div.examp").First().Text()
+	req.Header.Add("x-rapidapi-key", os.Getenv("LINGUA_API_KEY"))
+	req.Header.Add("x-rapidapi-host", "lingua-robot.p.rapidapi.com")
 
-		term := Term{
-			usage,
-			definition,
-			example,
-		}
-		fmt.Println("As a " + usage + ", " + query + " means: " + strings.TrimSuffix(definition, ": ") + ".\n-- " + example)
-		terms = append(terms, term)
-	})
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return definitions
+	}
 
-	return terms
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		return definitions
+	}
+
+	// load json response into definitions struct
+	json.Unmarshal(body, &definitions)
+
+	return definitions
 }
 
 /**
@@ -136,43 +154,51 @@ func fetchImage(query string) ImageSet {
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
 func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// was the command invoked correctly?
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
-	} else {
-		query := url.QueryEscape(strings.Join(command[1:], "-"))
-		terms := fetchDefinitions(query)
+		return
+	}
 
-		if len(terms) == 0 {
-			s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
-		} else {
-			var embed discordgo.MessageEmbed
-			embed.URL = fmt.Sprintf("https://dictionary.cambridge.org/us/dictionary/english/%s", query)
-			embed.Type = "rich"
-			embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
-			var fields []*discordgo.MessageEmbedField
-			for _, term := range terms {
-				if term.Usage != "" && term.Definition != "" {
-					var field discordgo.MessageEmbedField
-					field.Name = term.Usage
-					value := term.Definition + "\n"
-					if term.Example != "" {
-						value += "`" + term.Example + "`"
-					}
-					field.Value = value
-					field.Inline = false
-					fields = append(fields, &field)
+	query := url.QueryEscape(strings.Join(command[1:], "-"))
+	terms := fetchDefinitions(query)
+
+	// did the API return any definition?
+	if len(terms.Entries) == 0 {
+		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
+		return
+	}
+
+	// construct embed response
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "Definitions for \"" + strings.Join(command[1:], " ") + "\""
+	var fields []*discordgo.MessageEmbedField
+	for _, entry := range terms.Entries {
+		for _, definition := range entry.Definitions {
+			var field discordgo.MessageEmbedField
+			field.Name = definition.PartOfSpeech + " "
+			field.Value = ""
+			for index, sense := range definition.Senses {
+				labels := ""
+				if len(sense.Labels) != 0 {
+					labels += "(" + strings.Join(sense.Labels, ", ") + ")"
 				}
+				field.Value += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
 			}
-			embed.Fields = fields
-			var footer discordgo.MessageEmbedFooter
-			footer.Text = "Fetched from Cambridge Dictionary"
-			footer.IconURL = "https://seeklogo.com/images/U/university-of-cambridge-logo-E6ED593FBF-seeklogo.com.png"
-			embed.Footer = &footer
-
-			// send response
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			field.Inline = false
+			fields = append(fields, &field)
 		}
 	}
+	embed.Fields = fields
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "Fetched from Wiktionary"
+	footer.IconURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/WiktionaryEn_-_DP_Derivative.svg/1200px-WiktionaryEn_-_DP_Derivative.svg.png"
+	embed.Footer = &footer
+
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
 }
 
 /**

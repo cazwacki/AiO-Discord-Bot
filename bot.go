@@ -16,6 +16,16 @@ import (
 var start time.Time
 var prodMode bool
 var globalImageSet []*ImageSet
+var prefix string
+var commandList map[string]command
+
+type handler func(*discordgo.Session, *discordgo.MessageCreate, []string)
+
+type command struct {
+	invoke_format string
+	description   string
+	handle        handler
+}
 
 func appendToGlobalImageSet(newset ImageSet) {
 	globalImageSet = append(globalImageSet, &newset)
@@ -23,28 +33,58 @@ func appendToGlobalImageSet(newset ImageSet) {
 	fmt.Println(globalImageSet)
 }
 
-func runBot(token string) {
+/**
+Initialize command information and prefix
+*/
+func initCommandInfo() {
+	prefix = "~"
+	commandList = map[string]command{
+		"uptime":     {"uptime", "Reports the bot's current uptime.", handleUptime},
+		"shutdown":   {"shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", handleShutdown},
+		"invite":     {"invite", "Generates a server invitation valid for 24 hours.", handleInvite},
+		"profile":    {"profile @user", "Shows the profile image of a user in an embed.", handleProfile},
+		"nick":       {"nick @user <nickname>", "Renames the specified user to the provided nickname.", handleNickname},
+		"kick":       {"kick @user (reason: optional)", "Kicks the specified user from the server.", handleKick},
+		"ban":        {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
+		"mv":         {"mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", handleMove},
+		"cp":         {"cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", handleCopy},
+		"purge":      {"purge <number>", "Removes the <number> most recent messages from the channel.", handlePurge},
+		"define":     {"define <word/phrase>", "Returns a definition of the word/phrase if it is available.", handleDefine},
+		"google":     {"google <word/phrase>", "Returns the first five google results returned from the query.", handleGoogle},
+		"image":      {"image <word/phrase>", "Returns the first image from Google Images.", handleImage},
+		"perk":       {"perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", handlePerk},
+		"shrine":     {"shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", handleShrine},
+		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
+		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
+	}
+}
 
+func runBot(token string) {
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prodMode = true
 	}
 	start = time.Now()
 
+	// initialize bot
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
 		fmt.Println("Error creating discord session")
 		return
 	}
 
+	// add listeners
 	dg.AddHandler(messageCreate)
 	dg.AddHandler(messageReactionAdd)
 
+	// open connection to discord
 	err = dg.Open()
 	if err != nil {
 		fmt.Println("Error opening connection,", err)
 		return
 	}
+
+	initCommandInfo()
 
 	/** Open Connection to Twitter **/
 	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
@@ -81,37 +121,32 @@ func runTwitterLoop(api *anaconda.TwitterApi, dg *discordgo.Session) {
 	}
 }
 
-func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
+/**
+Creates an embed displaying all the potential commands and their functions.
+*/
+func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	// return all current commands and what they do
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
-	embed.Title = "How to use ZawackiBot"
+
+	embed.Title = "❓ How to Use ZawackiBot ❓"
+
+	// add a cute thumbnail
 	var thumbnail discordgo.MessageEmbedThumbnail
-	thumbnail.URL = "https://static.thenounproject.com/png/1248-200.png"
+	thumbnail.URL = "https://img.pngio.com/robot-icon-of-flat-style-available-in-svg-png-eps-ai-icon-robot-icon-png-256_256.png"
 	embed.Thumbnail = &thumbnail
+
+	// add all commands to the embed as a set of fields that are not inline
 	var commands []*discordgo.MessageEmbedField
-	commands = append(commands, createField("~uptime", "Reports the bot's current uptime.", false))
-	commands = append(commands, createField("~shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", false))
-	commands = append(commands, createField("~invite", "Generates a server invitation valid for 24 hours.", false))
-	commands = append(commands, createField("~nick @user <nickname>", "Renames the specified user to the provided nickname.", false))
-	commands = append(commands, createField("~kick @user (reason: optional)", "Kicks the specified user from the server.", false))
-	commands = append(commands, createField("~ban @user (reason:optional)", "Bans the specified user from the server.", false))
-	commands = append(commands, createField("~purge <number>", "Removes the <number> most recent messages from the channel.", false))
-	commands = append(commands, createField("~perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", false))
-	commands = append(commands, createField("~shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", false))
-	commands = append(commands, createField("~autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", false))
-	commands = append(commands, createField("~define <word/phrase>", "Returns a definition of the word/phrase if it is available.", false))
-	commands = append(commands, createField("~google <word/phrase>", "Returns the first five google results returned from the query.", false))
-	commands = append(commands, createField("~image <word/phrase>", "Returns the first image from Google Images.", false))
-	commands = append(commands, createField("~help", "Returns how to use each of the commands the bot has available.", false))
-	commands = append(commands, createField("~mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", false))
-	commands = append(commands, createField("~cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", false))
-	commands = append(commands, createField("~profile @user", "Shows the profile image of a user in an embed.", false))
+	commands = append(commands, createField("Command List", "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot/tree/code_improvements#commands) "+"for this bot now!", false))
 	embed.Fields = commands
+
+	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "Created by Charles Zawacki; Written in Go"
 	footer.IconURL = "https://avatars0.githubusercontent.com/u/44577941?s=460&u=4eb7b9ff5410be189eea9863c33916c805dbd2b2&v=4"
 	embed.Footer = &footer
+
 	// send response
 	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 
@@ -120,22 +155,6 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate) {
 /**
 Handler function when the discord session detects a message is created in
 a channel that the bot has access to.
-
-TODO: Make a map of {
-	command
-	description/help
-	handler_function
-}
-Then this "code" would be:
-dispatcher = commands[parsedCommand[0]];
-if (dispatcher != null) {
-	dispatcher(s, m, parsedCommand);
-}
-
-Similarly, the help function above would be really easy
-commands.forEach() {
-	add command.description to the result message.
-}
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore my testing channel
@@ -148,51 +167,21 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	parsedCommand := strings.Split(m.Content, " ")
+	invoke_word := strings.TrimPrefix(parsedCommand[0], prefix)
 
-	switch parsedCommand[0] {
-	case "~help":
-		go handleHelp(s, m)
-	// management commands
-	case "~uptime":
-		go handleUptime(s, m, start)
-	case "~shutdown":
-		go handleShutdown(s, m)
-	case "~invite":
-		go handleInvite(s, m)
-	case "~nick":
-		go handleNickname(s, m, parsedCommand)
-	case "~kick":
-		go handleKick(s, m, parsedCommand)
-	case "~ban":
-		go handleBan(s, m, parsedCommand)
-	case "~purge":
-		go handlePurge(s, m, parsedCommand)
-	case "~mv":
-		go handleMove(s, m, parsedCommand)
-	case "~cp":
-		go handleCopy(s, m, parsedCommand)
-	case "~profile":
-		go handleProfile(s, m, parsedCommand)
-	// dbd commands
-	case "~perk":
-		go handlePerk(s, m, parsedCommand)
-	case "~shrine":
-		go handleShrine(s, m)
-	case "~autoshrine":
-		go handleAutoshrine(s, m, parsedCommand)
-	// lookup commands
-	case "~define":
-		go handleDefine(s, m, parsedCommand)
-	case "~google":
-		go handleGoogle(s, m, parsedCommand)
-	case "~image":
-		go handleImage(s, m, parsedCommand)
+	// get the command information based on the invoke word
+	if validCommand, ok := commandList[invoke_word]; ok {
+		// special case: needs to pass in starting time
+		if parsedCommand[0] == prefix+"uptime" {
+			parsedCommand = []string{start.Format("2006-01-02 15:04:05.999999999 -0700 MST")}
+		}
+		go validCommand.handle(s, m, parsedCommand)
 	}
 }
 
 /**
 Used to handle scrolling through images given from ~image,
-but can and may be used to handle other reactions
+but can and may be used to handle other reactions in the future
 */
 func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	// Ignore all messages created by the bot itself as well as DMs

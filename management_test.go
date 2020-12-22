@@ -14,6 +14,7 @@ import (
 
 var response string
 var timeBetweenCommands time.Duration = 2 * time.Second
+var testingChannel string = "739852388264968243"
 
 /**
 Test anything that uses calculation outside of the discordgo commands.
@@ -40,7 +41,7 @@ func TestMessageResponse(t *testing.T) {
 
 	// -- tests
 	t.Run("Responds correctly to ~uptime", func(t *testing.T) {
-		dg.ChannelMessageSend("739852388264968243", "~uptime")
+		dg.ChannelMessageSend(testingChannel, "~uptime")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		regex := regexp.MustCompile(`^:robot: Uptime: \d\.\ds$`)
 		if !regex.MatchString(response) {
@@ -50,7 +51,7 @@ func TestMessageResponse(t *testing.T) {
 	})
 
 	t.Run("Generates invitation", func(t *testing.T) {
-		dg.ChannelMessageSend("739852388264968243", "~invite")
+		dg.ChannelMessageSend(testingChannel, "~invite")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if strings.HasPrefix(response, ":mailbox_with_mail: Here's your invitation! https://discord.gg/") == false {
 			t.Logf("Failed to generate invitation")
@@ -60,7 +61,7 @@ func TestMessageResponse(t *testing.T) {
 
 	t.Run("Permissions work appropriately", func(t *testing.T) {
 		randNum := rand.Intn(10000)
-		dg.ChannelMessageSend("739852388264968243", fmt.Sprintf("~nick <@!700962207785156668> test nickname %d", randNum))
+		dg.ChannelMessageSend(testingChannel, fmt.Sprintf("~nick <@!700962207785156668> test nickname %d", randNum))
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Done!" {
 			t.Logf("Failed to change valid nickname")
@@ -69,37 +70,79 @@ func TestMessageResponse(t *testing.T) {
 	})
 
 	t.Run("Incorrect usages are reported", func(t *testing.T) {
-		dg.ChannelMessageSend("739852388264968243", "~nick <@!700962207785156668>")
+		dg.ChannelMessageSend(testingChannel, "~nick <@!700962207785156668>")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Usage: `~nick @<user> <new name>`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
 			t.Fail()
 		}
 
-		dg.ChannelMessageSend("739852388264968243", "~kick user")
+		dg.ChannelMessageSend(testingChannel, "~kick user")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Usage: `~kick @<user> (reason: optional)`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
 			t.Fail()
 		}
 
-		dg.ChannelMessageSend("739852388264968243", "~kick")
+		dg.ChannelMessageSend(testingChannel, "~kick")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Usage: `~kick @<user> (reason: optional)`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
 			t.Fail()
 		}
 
-		dg.ChannelMessageSend("739852388264968243", "~ban user")
+		dg.ChannelMessageSend(testingChannel, "~ban user")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Usage: `~ban @<user> (reason: optional)`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
 			t.Fail()
 		}
 
-		dg.ChannelMessageSend("739852388264968243", "~ban")
+		dg.ChannelMessageSend(testingChannel, "~ban")
 		time.Sleep(timeBetweenCommands) // allow response to populate
 		if response != "Usage: `~ban @<user> (reason: optional)`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~profile")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~profile @user`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~profile user")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~profile @user`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~cp 3")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~cp <number <= 100> <#channel>`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~cp 3 fakechannel")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~cp <number <= 100> <#channel>`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~mv 3")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~mv <number <= 100> <#channel>`" {
+			t.Logf("Should have reported incorrect usage, but didn't")
+			t.Fail()
+		}
+
+		dg.ChannelMessageSend(testingChannel, "~mv 3 fakechannel")
+		time.Sleep(timeBetweenCommands) // allow response to populate
+		if response != "Usage: `~mv <number <= 100> <#channel>`" {
 			t.Logf("Should have reported incorrect usage, but didn't")
 			t.Fail()
 		}
@@ -107,7 +150,7 @@ func TestMessageResponse(t *testing.T) {
 
 	// -- teardown
 	time.Sleep(2 * time.Second)
-	dg.ChannelMessageSend("739852388264968243", "~shutdown")
+	dg.ChannelMessageSend(testingChannel, "~shutdown")
 	dg.Close()
 }
 

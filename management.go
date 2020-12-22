@@ -141,22 +141,35 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
 			return
 		}
-		if messageCount > 100 || messageCount < 1 {
-			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you can only purge 1-100 messages. Try again.")
-			return
+		if messageCount < 1 {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
 		}
-		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
-		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
-			return
-		}
+		for messageCount > 0 {
+			messagesToPurge := 0
+			// can only purge 100 messages per invocation
+			if messageCount > 100 {
+				messagesToPurge = 100
+			} else {
+				messagesToPurge = messageCount
+			}
 
-		var messageIDs []string
-		for _, message := range messages {
-			messageIDs = append(messageIDs, message.ID)
-		}
+			// get the last (messagesToPurge) messages from the channel
+			messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+				return
+			}
 
-		s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+			// get the message IDs
+			var messageIDs []string
+			for _, message := range messages {
+				messageIDs = append(messageIDs, message.ID)
+			}
+
+			// delete all the marked messages
+			s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+			messageCount -= messagesToPurge
+		}
 		time.Sleep(time.Second)
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
 	} else {
@@ -168,34 +181,49 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 Attempts to copy over the last <number> messages to the given channel, then outputs its success
 */
 func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string, preserveMessages bool) {
+	var commandInvoked string
+	if preserveMessages {
+		commandInvoked = "cp"
+	} else {
+		commandInvoked = "mv"
+	}
 	if len(command) == 3 {
 		messageCount, err := strconv.Atoi(command[1])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
+
+		// verify correctly invoking channel
 		if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 			return
 		}
 		channel := strings.ReplaceAll(command[2], "<#", "")
 		channel = strings.ReplaceAll(channel, ">", "")
+
+		// retrieve messages from current invoked channel
 		messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Usage: Ran into an error retrieving messages. :slight_frown:")
 			return
 		}
+
 		// construct an embed for each message
 		for index := range messages {
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 			message := messages[len(messages)-1-index]
+
+			// remove messages if calling mv command
 			if !preserveMessages {
 				err := s.ChannelMessageDelete(m.ChannelID, message.ID)
 				if err != nil {
 					fmt.Println(err)
 				}
 			}
+
+			// populating author information in the embed
 			if message.Author != nil {
 				member, err := s.GuildMember(m.GuildID, message.Author.ID)
 				nickname := ""
@@ -216,18 +244,23 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				thumbnail.URL = message.Author.AvatarURL("")
 				embed.Thumbnail = &thumbnail
 			}
+
+			// preserve message timestamp
 			embed.Timestamp = string(message.Timestamp)
 			var contents []*discordgo.MessageEmbedField
+
 			// output message text
 			if message.Content != "" {
 				embed.Description = "- \"" + message.Content + "\""
 			}
+
 			// output attachments
 			if len(message.Attachments) > 0 {
 				for _, attachment := range message.Attachments {
 					contents = append(contents, createField("Attachment: "+attachment.Filename, attachment.ProxyURL, false))
 				}
 			}
+
 			// output embed contents (up to 10... jesus christ...)
 			if len(message.Embeds) > 0 {
 				for _, embed := range message.Embeds {
@@ -247,6 +280,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					}
 				}
 			}
+
 			// ouput reactions on a message
 			if len(message.Reactions) > 0 {
 				reactionText := ""
@@ -259,15 +293,20 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				contents = append(contents, createField("Reactions", reactionText, false))
 			}
 			embed.Fields = contents
+
 			// send response
 			s.ChannelMessageSendEmbed(channel, &embed)
 		}
 		s.ChannelMessageSend(m.ChannelID, "Copied "+strconv.Itoa(messageCount)+" messages from <#"+m.ChannelID+"> to <#"+channel+">! :smile:")
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~cp <number <= 100> <#channel>`")
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~"+commandInvoked+" <number <= 100> <#channel>`")
 	}
 }
 
+/**
+Helper function for handleProfile. Attempts to retrieve a user's avatar and return it
+in an embed.
+*/
 func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	fmt.Println(command)
 	if len(command) == 2 {
@@ -279,11 +318,13 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 
+			// get user
 			user, err := s.User(userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
 			}
 
+			// get member data from the user
 			member, err := s.GuildMember(m.GuildID, userID)
 			nickname := ""
 			if err == nil {
@@ -291,6 +332,8 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			} else {
 				fmt.Println(err)
 			}
+
+			// title the embed
 			embed.Title = "Profile Picture for "
 			if nickname != "" {
 				embed.Title += nickname + " ("
@@ -300,6 +343,7 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 				embed.Title += ")"
 			}
 
+			// attach the user's avatar as 512x512 image
 			var image discordgo.MessageEmbedImage
 			image.URL = user.AvatarURL("512")
 			embed.Image = &image
@@ -316,14 +360,19 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 /**
 Outputs the bot's current uptime.
 **/
-func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start time.Time) {
-	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start).Truncate(time.Second/10).String())
+func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start []string) {
+	fmt.Println(start[0])
+	start_time, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", start[0])
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error parsing the date... :frowning:")
+	}
+	s.ChannelMessageSend(m.ChannelID, ":robot: Uptime: "+time.Since(start_time).Truncate(time.Second/10).String())
 }
 
 /**
 Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
 **/
-func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
+func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
 	s.Close()
 	os.Exit(0)
@@ -333,21 +382,21 @@ func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate) {
 Generates an invite code to the channel in which ~invite was invoked if the user has the
 permission to create instant invites.
 **/
-func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
-		var invite discordgo.Invite
-		invite.Temporary = false
-		invite.MaxAge = 21600 // 6 hours
-		invite.MaxUses = 0    // infinite uses
-		inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
-		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Error creating invite. Try again in a moment.")
-			fmt.Println(err)
-		} else {
-			s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+inviteResult.Code)
-		}
-	} else {
+func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to create an instant invite.")
+		return
+	}
+	var invite discordgo.Invite
+	invite.Temporary = false
+	invite.MaxAge = 21600 // 6 hours
+	invite.MaxUses = 0    // infinite uses
+	inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
+	if err != nil {
+		s.ChannelMessageSend(m.ChannelID, "Error creating invite. Try again in a moment.")
+		fmt.Println(err)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, ":mailbox_with_mail: Here's your invitation! https://discord.gg/"+inviteResult.Code)
 	}
 }
 
@@ -356,50 +405,44 @@ Nicknames the user if they target themselves, or nicknames a target user if the 
 ~nick has the permission to change nicknames.
 **/
 func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID) {
-		// see if user is trying to self-nickname
-		attemptRename(s, m, command)
-	} else if userHasValidPermissions(s, m, discordgo.PermissionManageNicknames) {
-		// validate caller has permission to nickname other users
-		attemptRename(s, m, command)
-	} else {
+	if !(userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID)) && !(userHasValidPermissions(s, m, discordgo.PermissionManageNicknames)) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to change nicknames.")
 	}
+	attemptRename(s, m, command)
 }
 
 /**
 Kicks a user from the server if the invoking user has the permission to kick users.
 **/
 func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
-		attemptKick(s, m, command)
-	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to kick users.")
 	}
+	attemptKick(s, m, command)
 }
 
 /**
 Bans a user from the server if the invoking user has the permission to ban users.
 **/
 func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
 		// validate caller has permission to kick other users
-		attemptBan(s, m, command)
-	} else {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to ban users.")
+		return
 	}
+	attemptBan(s, m, command)
 }
 
 /**
 Removes the <number> most recent messages from the channel where the command was called.
 **/
 func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptPurge(s, m, command)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to remove messages.")
+		return
 	}
+	attemptPurge(s, m, command)
 }
 
 /**
@@ -407,24 +450,27 @@ Copies the <number> most recent messages from the channel where the command was 
 pastes it in the requested channel.
 **/
 func handleCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptCopy(s, m, command, true)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
+		return
 	}
+	attemptCopy(s, m, command, true)
 }
 
 /**
 Same as above, but purges each message it copies
 **/
 func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptCopy(s, m, command, false)
-	} else {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage messages.")
+		return
 	}
+	attemptCopy(s, m, command, false)
 }
 
+/**
+Creates an embed showing a user's profile as a bigger image so it is more visible.
+*/
 func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	attemptProfile(s, m, command)
 }

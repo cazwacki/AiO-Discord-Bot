@@ -9,8 +9,9 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 1. If your environment does not have Go, [install it from here.](https://golang.org/dl/)
 2. Clone/download this code.
 3. [Create a bot on the Discord Developer Portal](https://discord.com/developers) and save its token.
-4. [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
-5. [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
+4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
+5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
+6. (~define functionality) [Get a Lingua API Key.](https://www.linguarobot.io/) The first 2500 requests a day are free.
 6. Set the following information as environment variables on the system you are deploying the bot:
    - BOT_TOKEN
    - TWITTER_API_KEY
@@ -18,6 +19,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
    - TWITTER_TOKEN
    - TWITTER_TOKEN_SECRET
    - GOOGLE_API_KEY
+   - LINGUA_API_KEY
 7. Call `go run .` to invoke the bot.
 
 ## Commands
@@ -28,7 +30,9 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~ban @user (reason: optional): Ban the specified user from the server.
 - [x] ~uptime: Reports the bot's current uptime.
 - [x] ~shutdown: Shuts down the bot. Note that if the bot is deployed on a webservice like Heroku, it will probably immediately restart by design.
-- [x]  ~purge (number): Removes the (number) most recent commands.
+- [x] ~purge (number): Removes the (number) most recent commands.
+- [x] ~mv (number) (#channel): Moves the last (number) messages from the channel it is invoked in and moves them to (#channel).
+- [x] ~cp (number) (#channel): Copies the last (number) messages from the channel it is invoked in and moves them to (#channel).
   
 ### Dead By Daylight Commands
 - [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
@@ -56,6 +60,10 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 1. I pull the page from whatever site I need to scrape information from.
 2. I use goquery (similar to jQuery) to parse and search for information.
 3. I use it to populate the messages sent to the channel.
+
+### Consuming Rest API in the intended way with Golang
+1. I create structs that will contain the JSON data returned from API queries.
+2. I use json.Unmarshal to parse the JSON response into the struct(s).
 
 ### New Language: Go
 I wanted to learn a new language since we are limited to C and Java in classes. I've done Javascript before, so I decided to write the bot in Go.
