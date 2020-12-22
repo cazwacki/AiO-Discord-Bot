@@ -49,4 +49,11 @@ func TestLookups(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("~wiki returns a valid page", func(t *testing.T) {
+		article := fetchArticle("Pandora's_Box")
+		if article.URLs == nil {
+			t.Fail()
+		}
+	})
 }

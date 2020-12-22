@@ -16,7 +16,27 @@ import (
 	"google.golang.org/api/googleapi/transport"
 )
 
-// JSON Unmarshaling for Lingua Bot
+// JSON Structs for Wikipedia
+type Article struct {
+	Title   *string       `json:"displaytitle,omitempty"`
+	Preview *Thumbnail    `json:"thumbnail,omitempty"`
+	URLs    *Content_URLs `json:"content_urls,omitempty"`
+	Extract string        `json:"extract,omitempty"`
+}
+
+type Thumbnail struct {
+	Source string `json:"source"`
+}
+
+type Content_URLs struct {
+	URLs URLSet `json:"desktop"`
+}
+
+type URLSet struct {
+	Page string `json:"page"`
+}
+
+// JSON Structs for Lingua Bot
 type DictResults struct {
 	Entries []Entry `json:"entries"`
 }
@@ -71,6 +91,10 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 			resultTitle := s.Find("h3").Text()
 			resultUrl := s.Find("a").AttrOr("href", "nil")
 			resultUrl = strings.Split(strings.TrimPrefix(resultUrl, "/url?q="), "&")[0]
+			// some URL decoding
+			resultUrl = strings.ReplaceAll(resultUrl, "%3F", "?")
+			resultUrl = strings.ReplaceAll(resultUrl, "%3D", "=")
+			resultUrl = strings.ReplaceAll(resultUrl, "%2520", "%20")
 			if resultUrl != "nil" && resultTitle != "" {
 				result := GoogleResult{
 					resultUrl,
@@ -150,6 +174,35 @@ func fetchImage(query string) ImageSet {
 	return newset
 }
 
+func fetchArticle(query string) Article {
+	var article Article
+
+	// fetch response from lingua robot API
+	url := "https://en.wikipedia.org/api/rest_v1/page/summary/" + query
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return article
+	}
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return article
+	}
+
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		return article
+	}
+
+	// load json response into definitions struct
+	json.Unmarshal(body, &article)
+
+	return article
+}
+
 /**
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
@@ -205,6 +258,7 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 Sends the first five search results for the query input by the user
 */
 func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// was the command invoked correctly?
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~google <word / phrase>`")
 		return
@@ -212,10 +266,12 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	results := fetchResults(strings.Join(command[1:], " "), 5)
 	fmt.Println("Here's the results!")
 
+	// did any results come in?
 	if len(results) == 0 {
 		s.ChannelMessageSend(m.ChannelID, "Unable to fetch Google results. Try again later :frowning:")
 		return
 	}
+
 	// construct embed response
 	var embed discordgo.MessageEmbed
 	embed.URL = fmt.Sprintf("https://www.google.com/search?q=%s&num=100&hl=en", url.QueryEscape(strings.Join(command[1:], " ")))
@@ -240,15 +296,19 @@ Creates and populates an ImageSet to be added to the globalImageSet. Sends the i
 to the channel with emotes that can be used to scroll between images.
 */
 func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// did the user format the command correctly?
 	if len(command) == 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
 		return
 	}
 	result := fetchImage(strings.Join(command[1:], " "))
+
+	// did the search engine return anything?
 	if len(result.Images) == 0 {
 		s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
 		return
 	}
+
 	// craft response and send
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
@@ -269,4 +329,34 @@ func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	s.MessageReactionAdd(m.ChannelID, result.MessageID, "➡️")
 	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⏹️")
 
+}
+
+func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~wiki <word / phrase>`")
+		return
+	}
+	query := strings.Join(command[1:], "_")
+	page := fetchArticle(query)
+
+	if page.URLs == nil {
+		s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
+		return
+	}
+
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = *page.Title
+	embed.Description = page.Extract
+	embed.URL = page.URLs.URLs.Page
+	var image discordgo.MessageEmbedImage
+	if page.Preview != nil {
+		image.URL = page.Preview.Source
+	}
+	embed.Image = &image
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "Pulled from Wikipedia"
+	footer.IconURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Wikipedia-logo-v2-en.svg/1200px-Wikipedia-logo-v2-en.svg.png"
+	embed.Footer = &footer
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 }

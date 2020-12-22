@@ -41,6 +41,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
   
 ### Lookup Commands
 - [x] ~define (word / phrase): Returns a definition of the word / phrase if it is available.
+- [x] ~wiki (word / phrase): Returns the extract of the topic from Wikipedia if it is available.
 - [x] ~google (word / phrase): Returns the first five results from Google Search Engine.
 - [x] ~image (word / phrase): Returns the first image from Google Search Engine
 - [x] ~help: Returns how to use each of the commands the bot has available.
