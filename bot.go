@@ -138,7 +138,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	embed.Thumbnail = &thumbnail
 
 	// add all commands to the embed as a set of fields that are not inline
-	embed.Description = "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot/tree/code_improvements#commands) for this bot now!"
+	embed.Description = "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot#commands) for this bot now!"
 
 	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
