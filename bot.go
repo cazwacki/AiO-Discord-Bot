@@ -166,6 +166,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	parsedCommand := strings.Split(m.Content, " ")
+	if !strings.HasPrefix(parsedCommand[0], prefix) {
+		return
+	}
 	invoke_word := strings.TrimPrefix(parsedCommand[0], prefix)
 
 	// get the command information based on the invoke word
