@@ -66,7 +66,7 @@ type GoogleResult struct {
 // ImageSet : holds 10 images and the associated message of an image query
 type ImageSet struct {
 	Query     string
-	MessageID string
+	Message   *discordgo.Message
 	Images    []string
 	Index     int
 }
@@ -322,12 +322,12 @@ func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	embed.Footer = &footer
 	message, _ := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 
-	result.MessageID = message.ID
-	appendToGlobalImageSet(result)
+	result.Message = message
+	go appendToGlobalImageSet(s, result)
 
-	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⬅️")
-	s.MessageReactionAdd(m.ChannelID, result.MessageID, "➡️")
-	s.MessageReactionAdd(m.ChannelID, result.MessageID, "⏹️")
+	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⬅️")
+	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "➡️")
+	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⏹️")
 
 }
 

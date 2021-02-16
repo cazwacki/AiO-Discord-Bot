@@ -27,10 +27,22 @@ type command struct {
 	handle        handler
 }
 
-func appendToGlobalImageSet(newset ImageSet) {
+func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 	globalImageSet = append(globalImageSet, &newset)
 	fmt.Println("Global Image Set:")
 	fmt.Println(globalImageSet)
+
+	time.Sleep(30 * time.Minute)
+
+	for i, set := range globalImageSet {
+		if &newset == set {
+			tmpSet := globalImageSet[0]
+			globalImageSet[0] = globalImageSet[i]
+			globalImageSet[i] = tmpSet
+			globalImageSet = globalImageSet[1:]
+			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+		}
+	}
 }
 
 /**
@@ -191,7 +203,7 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 		return
 	}
 	for i, set := range globalImageSet {
-		if set.MessageID == m.MessageID {
+		if set.Message.ID == m.MessageID {
 			if m.Emoji.Name == "⬅️" || m.Emoji.Name == "➡️" || m.Emoji.Name == "⏹️" {
 				/*
 					1. Remove the reaction the user made
