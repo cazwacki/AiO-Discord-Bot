@@ -198,6 +198,7 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
 			return
 		}
+
 		// 1. check 100 most recent messages
 		// 2. delete messages associated with the given user
 		// 3. if i didnt delete the required number of messages, check the next set
@@ -380,6 +381,7 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			user, err := s.User(userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
+				return
 			}
 
 			// get member data from the user
@@ -412,6 +414,68 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 		}
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
+	}
+}
+
+func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 2 {
+		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+		if regex.MatchString(command[1]) {
+			userID := strings.TrimSuffix(command[1], ">")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+
+			member, err := s.GuildMember(m.GuildID, userID)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
+				return
+			}
+
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+
+			// title the embed
+			embed.Title = "About " + member.User.Username + "#" + member.User.Discriminator
+
+			var contents []*discordgo.MessageEmbedField
+
+			joinDate, err := member.JoinedAt.Parse()
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error parsing Discord's dates. :frowning:")
+				return
+			}
+
+			contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
+			contents = append(contents, createField("Nickname", member.Nick, false))
+
+			// get user's roles in readable form
+			guildRoles, err := s.GuildRoles(m.GuildID)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error retrieving the guild's roles. :frowning:")
+				return
+			}
+			var rolesAttached []string
+
+			for _, role := range guildRoles {
+				for _, roleID := range member.Roles {
+					if role.ID == roleID {
+						rolesAttached = append(rolesAttached, role.Name)
+					}
+				}
+			}
+			contents = append(contents, createField("Roles", strings.Join(rolesAttached, ", "), false))
+
+			embed.Fields = contents
+
+			// send response
+			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
+			return
+		}
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
 	}
 }
 
@@ -531,4 +595,11 @@ Creates an embed showing a user's profile as a bigger image so it is more visibl
 */
 func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	attemptProfile(s, m, command)
+}
+
+/**
+Provides user details in an embed.
+*/
+func handleAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	attemptAbout(s, m, command)
 }

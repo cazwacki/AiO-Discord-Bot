@@ -69,6 +69,7 @@ func initCommandInfo() {
 		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
 		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
 		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
+		"about":      {"about @user", "Returns guild information about the user", handleAbout},
 	}
 }
 
