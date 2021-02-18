@@ -138,7 +138,7 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	if len(command) == 2 {
 		messageCount, err := strconv.Atoi(command[1])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
 			return
 		}
 		if messageCount < 1 {
@@ -155,15 +155,14 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 			// get the last (messagesToPurge) messages from the channel
 			messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+				return
+			}
 
 			// stop purging if there is nothing left to purge
 			if len(messages) < messagesToPurge {
 				messageCount = 0
-			}
-
-			if err != nil {
-				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
-				return
 			}
 
 			// get the message IDs
@@ -178,8 +177,61 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		}
 		time.Sleep(time.Second)
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
+	} else if len(command) == 3 {
+		// the behavior here is significantly different, so it warrants its own section.
+		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+		userID := ""
+		if regex.MatchString(command[2]) {
+			userID = strings.TrimSuffix(command[2], ">")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
+			return
+		}
+		messageCount, err := strconv.Atoi(command[1])
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
+			return
+		}
+		if messageCount < 1 {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
+			return
+		}
+		// 1. check 100 most recent messages
+		// 2. delete messages associated with the given user
+		// 3. if i didnt delete the required number of messages, check the next set
+		// 4. end conditions: required number of messages are deleted, or there are no more messages in the channel
+		currentID := m.ID
+		for messageCount > 0 {
+			messages, err := s.ChannelMessages(m.ChannelID, 100, currentID, "", "")
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+				return
+			}
+
+			// get the message IDs for the requested user
+			var messageIDs []string
+			for _, message := range messages {
+				if message.Author.ID == userID && messageCount > 0 {
+					messageIDs = append(messageIDs, message.ID)
+					messageCount--
+				} else {
+					currentID = message.ID
+				}
+			}
+
+			// delete all the marked messages
+			s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+
+			if len(messages) < 100 {
+				messageCount = 0
+			}
+		}
+		time.Sleep(time.Second)
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
 	}
 }
 
