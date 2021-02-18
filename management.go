@@ -138,7 +138,7 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	if len(command) == 2 {
 		messageCount, err := strconv.Atoi(command[1])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
 			return
 		}
 		if messageCount < 1 {
@@ -160,6 +160,11 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 				return
 			}
 
+			// stop purging if there is nothing left to purge
+			if len(messages) < messagesToPurge {
+				messageCount = 0
+			}
+
 			// get the message IDs
 			var messageIDs []string
 			for _, message := range messages {
@@ -172,8 +177,62 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		}
 		time.Sleep(time.Second)
 		s.ChannelMessageDelete(m.ChannelID, m.ID)
+	} else if len(command) == 3 {
+		// the behavior here is significantly different, so it warrants its own section.
+		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+		userID := ""
+		if regex.MatchString(command[2]) {
+			userID = strings.TrimSuffix(command[2], ">")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
+			return
+		}
+		messageCount, err := strconv.Atoi(command[1])
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
+			return
+		}
+		if messageCount < 1 {
+			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
+			return
+		}
+
+		// 1. check 100 most recent messages
+		// 2. delete messages associated with the given user
+		// 3. if i didnt delete the required number of messages, check the next set
+		// 4. end conditions: required number of messages are deleted, or there are no more messages in the channel
+		currentID := m.ID
+		for messageCount > 0 {
+			messages, err := s.ChannelMessages(m.ChannelID, 100, currentID, "", "")
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
+				return
+			}
+
+			// get the message IDs for the requested user
+			var messageIDs []string
+			for _, message := range messages {
+				if message.Author.ID == userID && messageCount > 0 {
+					messageIDs = append(messageIDs, message.ID)
+					messageCount--
+				} else {
+					currentID = message.ID
+				}
+			}
+
+			// delete all the marked messages
+			s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+
+			if len(messages) < 100 {
+				messageCount = 0
+			}
+		}
+		time.Sleep(time.Second)
+		s.ChannelMessageDelete(m.ChannelID, m.ID)
 	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number>`")
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
 	}
 }
 
@@ -322,6 +381,7 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			user, err := s.User(userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
+				return
 			}
 
 			// get member data from the user
@@ -354,6 +414,68 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 		}
 	} else {
 		s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
+	}
+}
+
+func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 2 {
+		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+		if regex.MatchString(command[1]) {
+			userID := strings.TrimSuffix(command[1], ">")
+			userID = strings.TrimPrefix(userID, "<@")
+			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+
+			member, err := s.GuildMember(m.GuildID, userID)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
+				return
+			}
+
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+
+			// title the embed
+			embed.Title = "About " + member.User.Username + "#" + member.User.Discriminator
+
+			var contents []*discordgo.MessageEmbedField
+
+			joinDate, err := member.JoinedAt.Parse()
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error parsing Discord's dates. :frowning:")
+				return
+			}
+
+			contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
+			contents = append(contents, createField("Nickname", member.Nick, false))
+
+			// get user's roles in readable form
+			guildRoles, err := s.GuildRoles(m.GuildID)
+			if err != nil {
+				s.ChannelMessageSend(m.ChannelID, "Error retrieving the guild's roles. :frowning:")
+				return
+			}
+			var rolesAttached []string
+
+			for _, role := range guildRoles {
+				for _, roleID := range member.Roles {
+					if role.ID == roleID {
+						rolesAttached = append(rolesAttached, role.Name)
+					}
+				}
+			}
+			contents = append(contents, createField("Roles", strings.Join(rolesAttached, ", "), false))
+
+			embed.Fields = contents
+
+			// send response
+			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
+			return
+		}
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
 	}
 }
 
@@ -473,4 +595,11 @@ Creates an embed showing a user's profile as a bigger image so it is more visibl
 */
 func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	attemptProfile(s, m, command)
+}
+
+/**
+Provides user details in an embed.
+*/
+func handleAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	attemptAbout(s, m, command)
 }

@@ -60,7 +60,7 @@ func initCommandInfo() {
 		"ban":        {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
 		"mv":         {"mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", handleMove},
 		"cp":         {"cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", handleCopy},
-		"purge":      {"purge <number>", "Removes the <number> most recent messages from the channel.", handlePurge},
+		"purge":      {"purge <number> (optional: @user)", "Removes the <number> most recent messages from the channel.", handlePurge},
 		"define":     {"define <word/phrase>", "Returns a definition of the word/phrase if it is available.", handleDefine},
 		"google":     {"google <word/phrase>", "Returns the first five google results returned from the query.", handleGoogle},
 		"image":      {"image <word/phrase>", "Returns the first image from Google Images.", handleImage},
@@ -69,6 +69,7 @@ func initCommandInfo() {
 		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
 		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
 		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
+		"about":      {"about @user", "Returns guild information about the user", handleAbout},
 	}
 }
 
