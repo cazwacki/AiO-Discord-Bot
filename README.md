@@ -30,9 +30,10 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~ban @user (reason: optional): Ban the specified user from the server.
 - [x] ~uptime: Reports the bot's current uptime.
 - [x] ~shutdown: Shuts down the bot. Note that if the bot is deployed on a webservice like Heroku, it will probably immediately restart by design.
-- [x] ~purge (number): Removes the (number) most recent commands.
+- [x] ~purge (number) (@user: optional): Removes the (number) most recent commands.
 - [x] ~mv (number) (#channel): Moves the last (number) messages from the channel it is invoked in and moves them to (#channel).
 - [x] ~cp (number) (#channel): Copies the last (number) messages from the channel it is invoked in and moves them to (#channel).
+- [x] ~about @user: Get user details related to the Guild the message was called in. 
   
 ### Dead By Daylight Commands
 - [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
