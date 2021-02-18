@@ -155,6 +155,12 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 			// get the last (messagesToPurge) messages from the channel
 			messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
+
+			// stop purging if there is nothing left to purge
+			if len(messages) < messagesToPurge {
+				messageCount = 0
+			}
+
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't pull messages from the channel. Try again.")
 				return
