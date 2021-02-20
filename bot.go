@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -16,6 +17,7 @@ import (
 var start time.Time
 var prodMode bool
 var globalImageSet []*ImageSet
+var globalInactiveSet []*InactiveSet
 var prefix string
 var commandList map[string]command
 
@@ -40,6 +42,24 @@ func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 			globalImageSet[0] = globalImageSet[i]
 			globalImageSet[i] = tmpSet
 			globalImageSet = globalImageSet[1:]
+			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+		}
+	}
+}
+
+func appendToGlobalInactiveSet(s *discordgo.Session, newset InactiveSet) {
+	globalInactiveSet = append(globalInactiveSet, &newset)
+	fmt.Println("Global Inactive Set:")
+	fmt.Println(globalInactiveSet)
+
+	time.Sleep(30 * time.Minute)
+
+	for i, set := range globalInactiveSet {
+		if &newset == set {
+			tmpSet := globalInactiveSet[0]
+			globalInactiveSet[0] = globalInactiveSet[i]
+			globalInactiveSet[i] = tmpSet
+			globalInactiveSet = globalInactiveSet[1:]
 			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
 		}
 	}
@@ -70,6 +90,7 @@ func initCommandInfo() {
 		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
 		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
 		"about":      {"about @user", "Returns guild information about the user", handleAbout},
+		"activity":   {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
 	}
 }
 
@@ -87,9 +108,20 @@ func runBot(token string) {
 		return
 	}
 
+	dbUsername = os.Getenv("DB_USERNAME")
+	dbPassword = os.Getenv("DB_PASSWORD")
+	db = os.Getenv("DB")
+	dbTable = os.Getenv("DB_TABLE")
+
 	// add listeners
 	dg.AddHandler(messageCreate)
 	dg.AddHandler(messageReactionAdd)
+	dg.AddHandler(guildMemberAdd)
+	dg.AddHandler(guildMemberRemove)
+	dg.AddHandler(guildCreate)
+	dg.AddHandler(guildDelete)
+
+	// dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers)
 
 	// open connection to discord
 	err = dg.Open()
@@ -169,6 +201,42 @@ Handler function when the discord session detects a message is created in
 a channel that the bot has access to.
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	go logActivity(m.GuildID, m.Author, time.Now().String(), "Wrote a message in <#"+m.ChannelID+">", false)
+	go respondToCommands(s, m)
+}
+
+/**
+Used to handle scrolling through images given from ~image,
+but can and may be used to handle other reactions in the future
+*/
+func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
+	go navigateImages(s, m)
+	user, err := s.User(m.UserID)
+	if err != nil {
+		fmt.Println("Error grabbing the user from m.UserID; " + err.Error())
+		return
+	}
+	go logActivity(m.GuildID, user, time.Now().String(), "Reacted with :"+m.Emoji.Name+": to a message in <#"+m.ChannelID+">", false)
+}
+
+func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
+	logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
+}
+
+func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
+	removeUser(m.GuildID, m.User.ID)
+}
+
+func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
+	fmt.Println(m.Name + ", " + m.ID)
+	go logNewGuild(s, m.ID)
+}
+
+func guildDelete(s *discordgo.Session, m *discordgo.GuildDelete) {
+	removeGuild(m.ID)
+}
+
+func respondToCommands(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore my testing channel
 	if prodMode && m.ChannelID == "739852388264968243" {
 		return
@@ -194,11 +262,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-/**
-Used to handle scrolling through images given from ~image,
-but can and may be used to handle other reactions in the future
-*/
-func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
+func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	// Ignore all messages created by the bot itself as well as DMs
 	if m.UserID == s.State.User.ID {
 		return
@@ -246,6 +310,55 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 					s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
 					s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
 				}
+			}
+		}
+	}
+	for _, set := range globalInactiveSet {
+		if set.Message.ID == m.MessageID {
+			if m.Emoji.Name == "◀️" || m.Emoji.Name == "▶️" {
+				// craft response and send
+				var embed discordgo.MessageEmbed
+				embed.Type = "rich"
+				if set.DaysInactive > 0 {
+					embed.Title = "Users Inactive for " + strconv.Itoa(set.DaysInactive) + "+ Days"
+				} else {
+					embed.Title = "User Activity"
+				}
+
+				pageCount := len(set.Inactives) / 8
+				if len(set.Inactives)%8 != 0 {
+					pageCount++
+				}
+
+				if m.Emoji.Name == "◀️" {
+					if set.Index != 0 {
+						set.Index--
+					}
+				} else if m.Emoji.Name == "▶️" {
+					if set.Index != pageCount {
+						set.Index++
+					}
+				}
+
+				var contents []*discordgo.MessageEmbedField
+				for i := set.Index * 8; i < set.Index*8+8 && i < len(set.Inactives); i++ {
+					// calculate difference between time.Now() and the provided timestamp
+					dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+					lastActive, err := time.Parse(dateFormat, strings.Split(set.Inactives[i].LastActive, " m=")[0])
+					if err != nil {
+						fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+						return
+					}
+					contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
+				}
+				embed.Fields = contents
+
+				var footer discordgo.MessageEmbedFooter
+				footer.Text = fmt.Sprintf("Page %d of %d", set.Index+1, pageCount)
+				embed.Footer = &footer
+
+				s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
+				s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
 			}
 		}
 	}

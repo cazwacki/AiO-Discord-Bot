@@ -425,6 +425,8 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			userID = strings.TrimPrefix(userID, "<@")
 			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 
+			fmt.Println(command)
+
 			member, err := s.GuildMember(m.GuildID, userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
@@ -445,8 +447,13 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 				return
 			}
 
+			nickname := "N/A"
+			if member.Nick != "" {
+				nickname = member.Nick
+			}
+
 			contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
-			contents = append(contents, createField("Nickname", member.Nick, false))
+			contents = append(contents, createField("Nickname", nickname, false))
 
 			// get user's roles in readable form
 			guildRoles, err := s.GuildRoles(m.GuildID)
@@ -468,7 +475,10 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			embed.Fields = contents
 
 			// send response
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			if err != nil {
+				fmt.Println("Couldn't send the message... " + err.Error())
+			}
 
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
