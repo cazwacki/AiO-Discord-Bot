@@ -45,7 +45,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	description = strings.ReplaceAll(description, "'", "''")
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -79,7 +79,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -114,7 +114,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		after = memberList[len(memberList)-1].User.ID
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -163,7 +163,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 
 // removes the provided guild's members from the database.
 func removeGuild(guildID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "')")
@@ -205,7 +205,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 
 			// parse userID, get it from the db, present info
-			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 			defer db.Close()
 
 			if err != nil {
@@ -315,7 +315,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		return inactiveUsers
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
