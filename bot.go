@@ -341,25 +341,27 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 					}
 				}
 
-				var contents []*discordgo.MessageEmbedField
-				for i := set.Index * 8; i < set.Index*8+8 && i < len(set.Inactives); i++ {
-					// calculate difference between time.Now() and the provided timestamp
-					dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
-					lastActive, err := time.Parse(dateFormat, strings.Split(set.Inactives[i].LastActive, " m=")[0])
-					if err != nil {
-						fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
-						return
+				if set.Index > 0 && set.Index < pageCount {
+					var contents []*discordgo.MessageEmbedField
+					for i := set.Index * 8; i < set.Index*8+8 && i < len(set.Inactives); i++ {
+						// calculate difference between time.Now() and the provided timestamp
+						dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+						lastActive, err := time.Parse(dateFormat, strings.Split(set.Inactives[i].LastActive, " m=")[0])
+						if err != nil {
+							fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+							return
+						}
+						contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
 					}
-					contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
+					embed.Fields = contents
+
+					var footer discordgo.MessageEmbedFooter
+					footer.Text = fmt.Sprintf("Page %d of %d", set.Index+1, pageCount)
+					embed.Footer = &footer
+
+					s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
+					s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
 				}
-				embed.Fields = contents
-
-				var footer discordgo.MessageEmbedFooter
-				footer.Text = fmt.Sprintf("Page %d of %d", set.Index+1, pageCount)
-				embed.Footer = &footer
-
-				s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
-				s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
 			}
 		}
 	}
