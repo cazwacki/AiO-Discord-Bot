@@ -539,6 +539,7 @@ Nicknames the user if they target themselves, or nicknames a target user if the 
 func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !(userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID)) && !(userHasValidPermissions(s, m, discordgo.PermissionManageNicknames)) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to change nicknames.")
+		return
 	}
 	attemptRename(s, m, command)
 }
@@ -550,6 +551,7 @@ func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to kick users.")
+		return
 	}
 	attemptKick(s, m, command)
 }
