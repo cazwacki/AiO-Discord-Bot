@@ -121,7 +121,7 @@ func runBot(token string) {
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(guildDelete)
 
-	// dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuildMembers)
+	*dg.Identify.Intents = discordgo.IntentsGuildMembers
 
 	// open connection to discord
 	err = dg.Open()
@@ -220,15 +220,16 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 }
 
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
+	fmt.Println("User was added to guild")
 	logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
 }
 
 func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
+	fmt.Println("User was removed from guild")
 	removeUser(m.GuildID, m.User.ID)
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
-	fmt.Println(m.Name + ", " + m.ID)
 	go logNewGuild(s, m.ID)
 }
 
