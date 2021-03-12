@@ -336,12 +336,12 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 						set.Index--
 					}
 				} else if m.Emoji.Name == "▶️" {
-					if set.Index != pageCount {
+					if set.Index != pageCount-1 {
 						set.Index++
 					}
 				}
 
-				if set.Index > 0 && set.Index < pageCount {
+				if set.Index >= 0 && set.Index < pageCount {
 					var contents []*discordgo.MessageEmbedField
 					for i := set.Index * 8; i < set.Index*8+8 && i < len(set.Inactives); i++ {
 						// calculate difference between time.Now() and the provided timestamp
