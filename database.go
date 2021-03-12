@@ -45,7 +45,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	description = strings.ReplaceAll(description, "'", "''")
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -79,7 +79,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -114,7 +114,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		after = memberList[len(memberList)-1].User.ID
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -163,7 +163,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 
 // removes the provided guild's members from the database.
 func removeGuild(guildID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "')")
@@ -184,14 +184,14 @@ COMMANDS
 ****/
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 && len(command) > 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>```")
+		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		return
 	}
 
 	switch command[1] {
 	case "rescan":
 		if len(command) != 2 {
-			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>```")
+			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 			return
 		}
 		membersAdded := logNewGuild(s, m.GuildID)
@@ -205,7 +205,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 
 			// parse userID, get it from the db, present info
-			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 			defer db.Close()
 
 			if err != nil {
@@ -299,7 +299,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		s.MessageReactionAdd(m.ChannelID, message.ID, "▶️")
 	default:
 		// something about usage
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>```")
+		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		return
 	}
 }
@@ -311,11 +311,11 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 	var inactiveUsers []MemberActivity
 	// fetch all users in this guild, then filter to users who have been inactive more than <number> days
 	if len(command) != 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>```")
+		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		return inactiveUsers
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -343,7 +343,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		}
 		daysInactive, err := strconv.Atoi(command[2])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>```")
+			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 			return inactiveUsers
 		}
 
