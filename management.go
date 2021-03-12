@@ -425,6 +425,8 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			userID = strings.TrimPrefix(userID, "<@")
 			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
 
+			fmt.Println(command)
+
 			member, err := s.GuildMember(m.GuildID, userID)
 			if err != nil {
 				s.ChannelMessageSend(m.ChannelID, "Error retrieving the user. :frowning:")
@@ -445,8 +447,13 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 				return
 			}
 
+			nickname := "N/A"
+			if member.Nick != "" {
+				nickname = member.Nick
+			}
+
 			contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
-			contents = append(contents, createField("Nickname", member.Nick, false))
+			contents = append(contents, createField("Nickname", nickname, false))
 
 			// get user's roles in readable form
 			guildRoles, err := s.GuildRoles(m.GuildID)
@@ -468,7 +475,10 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			embed.Fields = contents
 
 			// send response
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			if err != nil {
+				fmt.Println("Couldn't send the message... " + err.Error())
+			}
 
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
@@ -529,6 +539,7 @@ Nicknames the user if they target themselves, or nicknames a target user if the 
 func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !(userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID)) && !(userHasValidPermissions(s, m, discordgo.PermissionManageNicknames)) {
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to change nicknames.")
+		return
 	}
 	attemptRename(s, m, command)
 }
@@ -540,6 +551,7 @@ func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
 		// validate caller has permission to kick other users
 		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to kick users.")
+		return
 	}
 	attemptKick(s, m, command)
 }

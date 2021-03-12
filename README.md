@@ -33,6 +33,9 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~purge (number) (@user: optional): Removes the (number) most recent commands.
 - [x] ~mv (number) (#channel): Moves the last (number) messages from the channel it is invoked in and moves them to (#channel).
 - [x] ~cp (number) (#channel): Copies the last (number) messages from the channel it is invoked in and moves them to (#channel).
+- [x] ~activity list (number): Returns a report of users who have been inactive for (number) days or more.
+- [x] ~activity user @user: Returns the user's last sign of activity.
+- [x] ~activity rescan: (Should be useless most of the time) Checks for any users in a server that are not in the database, and adds them to it.
 - [x] ~about @user: Get user details related to the Guild the message was called in. 
   
 ### Dead By Daylight Commands
