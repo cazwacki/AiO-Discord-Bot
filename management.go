@@ -283,6 +283,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			}
 
 			// populating author information in the embed
+			var embedAuthor discordgo.MessageEmbedAuthor
 			if message.Author != nil {
 				member, err := s.GuildMember(m.GuildID, message.Author.ID)
 				nickname := ""
@@ -291,18 +292,17 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				} else {
 					fmt.Println(err)
 				}
-				embed.Title = ""
+				embedAuthor.Name = ""
 				if nickname != "" {
-					embed.Title += nickname + " ("
+					embedAuthor.Name += nickname + " ("
 				}
-				embed.Title += message.Author.Username + "#" + message.Author.Discriminator
+				embedAuthor.Name += message.Author.Username + "#" + message.Author.Discriminator
 				if nickname != "" {
-					embed.Title += ")"
+					embedAuthor.Name += ")"
 				}
-				var thumbnail discordgo.MessageEmbedThumbnail
-				thumbnail.URL = message.Author.AvatarURL("")
-				embed.Thumbnail = &thumbnail
+				embedAuthor.IconURL = message.Author.AvatarURL("")
 			}
+			embed.Author = &embedAuthor
 
 			// preserve message timestamp
 			embed.Timestamp = string(message.Timestamp)
@@ -310,7 +310,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 			// output message text
 			if message.Content != "" {
-				embed.Description = "- \"" + message.Content + "\""
+				embed.Description = message.Content
 			}
 
 			// output attachments
