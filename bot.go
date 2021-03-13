@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -203,6 +204,7 @@ a channel that the bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	go logActivity(m.GuildID, m.Author, time.Now().String(), "Wrote a message in <#"+m.ChannelID+">", false)
 	go respondToCommands(s, m)
+	go checkForMessageLink(s, m)
 }
 
 /**
@@ -235,6 +237,72 @@ func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
 
 func guildDelete(s *discordgo.Session, m *discordgo.GuildDelete) {
 	removeGuild(m.ID)
+}
+
+func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
+	// Ignore my testing channel
+	if prodMode && m.ChannelID == "739852388264968243" {
+		return
+	}
+	// Ignore all messages created by the bot itself as well as DMs
+	if m.Author.ID == s.State.User.ID || m.GuildID == "" {
+		return
+	}
+	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]{18}\/[0-9]{18}\/[0-9]{18}`)
+	match := regex.FindStringSubmatch(m.Content)
+	if match != nil {
+		// verify the message came from within the guild
+		linkData := strings.Split(match[0], "/")
+		if linkData[4] == m.GuildID {
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+
+			// populating author information in the embed
+			var embedAuthor discordgo.MessageEmbedAuthor
+			if m.Author != nil {
+				member, err := s.GuildMember(m.GuildID, m.Author.ID)
+				nickname := ""
+				if err == nil {
+					nickname = member.Nick
+				} else {
+					fmt.Println(err)
+				}
+				embedAuthor.Name = ""
+				if nickname != "" {
+					embedAuthor.Name += nickname + " ("
+				}
+				embedAuthor.Name += m.Author.Username + "#" + m.Author.Discriminator
+				if nickname != "" {
+					embedAuthor.Name += ")"
+				}
+				embedAuthor.IconURL = m.Author.AvatarURL("")
+			}
+			embed.Author = &embedAuthor
+
+			linkedMessage, err := s.ChannelMessage(linkData[5], linkData[6])
+			if err != nil {
+				fmt.Println("ERROR linking message: " + err.Error())
+				return
+			}
+
+			// add user's message information
+			embed.Description = linkedMessage.Content
+			embed.Timestamp = string(linkedMessage.Timestamp)
+
+			linkedMessageChannel, err := s.Channel(linkData[5])
+			if err != nil {
+				fmt.Println("ERROR linking message: " + err.Error())
+				return
+			}
+
+			var footer discordgo.MessageEmbedFooter
+			footer.Text = "in #" + linkedMessageChannel.Name
+			embed.Footer = &footer
+
+			// send response
+			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		}
+	}
 }
 
 func respondToCommands(s *discordgo.Session, m *discordgo.MessageCreate) {

@@ -65,10 +65,10 @@ type GoogleResult struct {
 
 // ImageSet : holds 10 images and the associated message of an image query
 type ImageSet struct {
-	Query     string
-	Message   *discordgo.Message
-	Images    []string
-	Index     int
+	Query   string
+	Message *discordgo.Message
+	Images  []string
+	Index   int
 }
 
 /**
@@ -343,6 +343,12 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 		s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
 		return
 	}
+
+	// clean <i> and <b> from page title
+	*page.Title = strings.ReplaceAll(*page.Title, "<i>", "_")
+	*page.Title = strings.ReplaceAll(*page.Title, "</i>", "_")
+	*page.Title = strings.ReplaceAll(*page.Title, "<b>", "**")
+	*page.Title = strings.ReplaceAll(*page.Title, "</b>", "**")
 
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"

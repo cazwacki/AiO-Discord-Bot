@@ -24,6 +24,8 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 
 ## Commands
 
+(The bot detects message links. If the source message is in the guild, it will output it in the chat after the user's message.)
+
 ### Standard / Management
 - [x] ~nick @user (new username): If you have the permissions, nickname the specified user on the server.
 - [x] ~kick @user (reason: optional): Kick the specified user from the server.
