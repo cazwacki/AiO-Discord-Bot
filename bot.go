@@ -257,10 +257,16 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
 
+			linkedMessage, err := s.ChannelMessage(linkData[5], linkData[6])
+			if err != nil {
+				fmt.Println("ERROR linking message: " + err.Error())
+				return
+			}
+
 			// populating author information in the embed
 			var embedAuthor discordgo.MessageEmbedAuthor
-			if m.Author != nil {
-				member, err := s.GuildMember(m.GuildID, m.Author.ID)
+			if linkedMessage.Author != nil {
+				member, err := s.GuildMember(linkedMessage.GuildID, linkedMessage.Author.ID)
 				nickname := ""
 				if err == nil {
 					nickname = member.Nick
@@ -271,19 +277,13 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 				if nickname != "" {
 					embedAuthor.Name += nickname + " ("
 				}
-				embedAuthor.Name += m.Author.Username + "#" + m.Author.Discriminator
+				embedAuthor.Name += linkedMessage.Author.Username + "#" + linkedMessage.Author.Discriminator
 				if nickname != "" {
 					embedAuthor.Name += ")"
 				}
-				embedAuthor.IconURL = m.Author.AvatarURL("")
+				embedAuthor.IconURL = linkedMessage.Author.AvatarURL("")
 			}
 			embed.Author = &embedAuthor
-
-			linkedMessage, err := s.ChannelMessage(linkData[5], linkData[6])
-			if err != nil {
-				fmt.Println("ERROR linking message: " + err.Error())
-				return
-			}
 
 			// add user's message information
 			embed.Description = linkedMessage.Content
