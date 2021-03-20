@@ -295,6 +295,18 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 				return
 			}
 
+			var contents []*discordgo.MessageEmbedField
+
+			// output attachments
+			if len(linkedMessage.Attachments) > 0 {
+				for i, attachment := range linkedMessage.Attachments {
+					title := fmt.Sprintf("Attachment %d: %s", i+1, attachment.Filename)
+					contents = append(contents, createField(title, attachment.ProxyURL, false))
+				}
+			}
+
+			embed.Fields = contents
+
 			var footer discordgo.MessageEmbedFooter
 			footer.Text = "in #" + linkedMessageChannel.Name
 			embed.Footer = &footer
