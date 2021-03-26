@@ -87,7 +87,7 @@ func removeUser(guildID string, userID string) {
 		return
 	}
 
-	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + userID + "');")
+	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + strings.ReplaceAll(userID, "'", "\\'") + "');")
 	defer query.Close()
 	if err != nil {
 		fmt.Println("Unable to delete user's activity! " + err.Error())
