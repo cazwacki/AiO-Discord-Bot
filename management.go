@@ -505,9 +505,17 @@ func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start []stri
 Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
 **/
 func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
-	s.Close()
-	os.Exit(0)
+	if(m.Author.ID == "172311520045170688") {
+		s.ChannelMessageSend(m.ChannelID, "Shutting Down.")
+		s.Close()
+		os.Exit(0)
+	} else {
+		s.ChannelMessageSend(m.ChannelID, "You dare try and go against the wishes of <@172311520045170688> ..? ")
+		time.Sleep(10 * time.Second)
+		s.ChannelMessageSend(m.ChannelID, "Bruh this gonna be you when sage and his boys get here... I just pinged him so you better be afraid :slight_smile:")
+		time.Sleep(2 * time.Second)
+		s.ChannelMessageSend(m.ChannelID, "https://media4.giphy.com/media/3o6Ztm3eJNDBy4NfiM/giphy.gif")
+	}
 }
 
 /**
