@@ -59,7 +59,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	if newUser {
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
-		query, err := db.Query("INSERT INTO " + dbTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + user.Username + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
+		query, err := db.Query("INSERT INTO " + dbTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
 		defer query.Close()
 		if err != nil {
 			fmt.Println("Unable to insert new user! " + err.Error())
