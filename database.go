@@ -67,7 +67,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 		}
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
-		query, err := db.Query("UPDATE " + dbTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + user.Username + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+		query, err := db.Query("UPDATE " + dbTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
 		defer query.Close()
 		if err != nil {
 			fmt.Println("Unable to update user's activity! " + err.Error())
