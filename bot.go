@@ -92,6 +92,7 @@ func initCommandInfo() {
 		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
 		"about":      {"about @user", "Returns guild information about the user", handleAbout},
 		"activity":   {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
+		"leaderboard":{"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
 	}
 }
 
@@ -112,7 +113,8 @@ func runBot(token string) {
 	dbUsername = os.Getenv("DB_USERNAME")
 	dbPassword = os.Getenv("DB_PASSWORD")
 	db = os.Getenv("DB")
-	dbTable = os.Getenv("DB_TABLE")
+	activityTable = os.Getenv("ACTIVITY_TABLE")
+	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 
 	// add listeners
 	dg.AddHandler(messageCreate)
@@ -176,7 +178,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 
-	embed.Title = "❓ How to Use ZawackiBot ❓"
+	embed.Title = "❓ How to Use SageBot ❓"
 
 	// add a cute thumbnail
 	var thumbnail discordgo.MessageEmbedThumbnail
@@ -202,9 +204,10 @@ Handler function when the discord session detects a message is created in
 a channel that the bot has access to.
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	go logActivity(m.GuildID, m.Author, time.Now().String(), "Wrote a message in <#"+m.ChannelID+">", false)
-	go respondToCommands(s, m)
 	go checkForMessageLink(s, m)
+	go logActivity(m.GuildID, m.Author, time.Now().String(), "Wrote a message in <#"+m.ChannelID+">", false)
+	awardPoints(m.GuildID, m.Author, time.Now().String(), m.Content)
+	respondToCommands(s, m)
 }
 
 /**
