@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"math"
+	"sort"
 
 	"github.com/bwmarrin/discordgo"
 	_ "github.com/go-sql-driver/mysql"
@@ -15,7 +17,8 @@ import (
 var dbUsername string
 var dbPassword string
 var db string
-var dbTable string
+var activityTable string
+var leaderboardTable string
 
 type MemberActivity struct {
 	ID          int    `json:"entry"`
@@ -24,6 +27,15 @@ type MemberActivity struct {
 	MemberName  string `json:"member_name"`
 	LastActive  string `json:"last_active"`
 	Description string `json:"description"`
+}
+
+type LeaderboardEntry struct {
+	ID              int    `json:"entry"`
+	GuildID         string `json:"guild_id"`
+	MemberID        string `json:"member_id"`
+	MemberName      string `json:"member_name"`
+	Points          int    `json:"points"`
+	LastAwarded     string `json:"last_awarded"`
 }
 
 type InactiveSet struct {
@@ -59,7 +71,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	if newUser {
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
-		query, err := db.Query("INSERT INTO " + dbTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
+		query, err := db.Query("INSERT INTO " + activityTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
 		defer query.Close()
 		if err != nil {
 			fmt.Println("Unable to insert new user! " + err.Error())
@@ -67,7 +79,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 		}
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
-		query, err := db.Query("UPDATE " + dbTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+		query, err := db.Query("UPDATE " + activityTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
 		defer query.Close()
 		if err != nil {
 			fmt.Println("Unable to update user's activity! " + err.Error())
@@ -87,7 +99,7 @@ func removeUser(guildID string, userID string) {
 		return
 	}
 
-	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + strings.ReplaceAll(userID, "'", "\\'") + "');")
+	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + strings.ReplaceAll(userID, "'", "\\'") + "');")
 	defer query.Close()
 	if err != nil {
 		fmt.Println("Unable to delete user's activity! " + err.Error())
@@ -122,7 +134,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		return 0
 	}
 
-	results, err := db.Query("SELECT * FROM " + dbTable + " WHERE (guild_id = '" + guildID + "')")
+	results, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
 	defer results.Close()
 
 	if err != nil {
@@ -165,25 +177,149 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 func removeGuild(guildID string) {
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
+	if err != nil {
+		fmt.Println("Unable to open DB connection! " + err.Error())
+		return
+	}
 
-	query, err := db.Query("DELETE FROM " + dbTable + " WHERE (guild_id = '" + guildID + "')")
+	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
 	defer query.Close()
 	if err != nil {
 		fmt.Println("Unable to delete guild from database! " + err.Error())
 		return
 	}
+}
 
+// awards a user points for the guild's leaderboard based on the word count formula.
+func awardPoints(guildID string, user *discordgo.User, current_time string, message string) {
+	if user.Bot {
+		return
+	}
+
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	defer db.Close()
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
+	}
+
+	// 1. calculate points from sentence
+	wordCount := len(strings.Split(message, " "))
+
+	pointsToAward := int(math.Floor(math.Pow(float64(wordCount), float64(1)/3)*10 - 10))
+
+	query, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+	defer query.Close()
+	if err != nil {
+		fmt.Println("Error with SELECT query: " + err.Error())
+	}
+	
+	foundUser := false
+	for query.Next() {
+		foundUser = true
+		var leaderboardEntry LeaderboardEntry
+		err = query.Scan(&leaderboardEntry.ID, &leaderboardEntry.GuildID, &leaderboardEntry.MemberID, &leaderboardEntry.MemberID, &leaderboardEntry.Points, &leaderboardEntry.LastAwarded)
+		if err != nil {
+			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			return
+		} else {
+			dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+			lastAwarded, err := time.Parse(dateFormat, strings.Split(leaderboardEntry.LastAwarded, " m=")[0])
+			if err != nil {
+				fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+				return
+			}
+			lastAwarded = lastAwarded.Add(time.Second * 3)
+			if lastAwarded.Before(time.Now()) {
+				// add points
+				newScore := pointsToAward + leaderboardEntry.Points
+				_, err := db.Query("UPDATE " + leaderboardTable + " SET last_awarded = '" + current_time + "', points = '" + strconv.Itoa(newScore) + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+				if err != nil {
+					fmt.Println("Unable to update member's points in database! " + err.Error())
+					return
+				}
+			}
+		}
+	}
+		
+	if !foundUser {
+		query, err := db.Query("INSERT INTO " + leaderboardTable + " (guild_id, member_id, member_name, points, last_awarded) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "', '" + strconv.Itoa(pointsToAward) + "', '" + current_time + "');")
+		defer query.Close()
+		if err != nil {
+			fmt.Println("Unable to insert new user! " + err.Error())
+			return
+		}
 	}
 }
 
 /****
 COMMANDS
 ****/
+func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) > 1 {
+		s.ChannelMessageSend(m.ChannelID, "Usages: ```~leaderboard```")
+		return
+	}
+
+	if len(command) == 1 {
+		// generate leaderboard of top 10 users with corresponding points, with user's score at the bottom
+		db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+		defer db.Close()
+		if err != nil {
+			fmt.Println("Unable to open DB connection! " + err.Error())
+			return
+		}
+
+		// 1. Get all members of the guild the command was invoked in and sort by points
+		results, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + m.GuildID + "')")
+		defer results.Close()
+	
+		if err != nil {
+			s.ChannelMessageSend(m.ChannelID, "Unable to read database for existing users in the guild! " + err.Error())
+			return
+		}
+
+		// create array of users
+		var leaderboardEntries []LeaderboardEntry
+		for results.Next() {
+			var entry LeaderboardEntry
+			err = results.Scan(&entry.ID, &entry.GuildID, &entry.MemberID, &entry.MemberName, &entry.Points, &entry.LastAwarded)
+			if err != nil {
+				fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+				return
+			}
+			leaderboardEntries = append(leaderboardEntries, entry)
+		}
+
+		// sort by points
+		sort.Slice(leaderboardEntries, func(i, j int) bool {
+			return leaderboardEntries[i].Points > leaderboardEntries[j].Points
+		})
+
+		message := "```perl\n"
+		// 2. Create a for loop codesnippet message showing the names and ranks of top 10s
+		for i := 0; i < len(leaderboardEntries) && i < 10; i++ {
+			message += fmt.Sprintf("%d.\t%s\n\t\tPoints: %d\n", (i+1), leaderboardEntries[i].MemberName, leaderboardEntries[i].Points)
+		}
+
+		var authorEntry LeaderboardEntry
+		position := 0
+		for i := range leaderboardEntries {
+			if leaderboardEntries[i].MemberID == m.Author.ID {
+				authorEntry = leaderboardEntries[i]
+				position = i + 1
+			}
+		}
+		message += "----------------------------------------\nYour Position:\n"
+		message += fmt.Sprintf("%d. %s\n\tPoints: %d\n```", position, authorEntry.MemberName, authorEntry.Points)
+
+		// 3. send leaderboard
+		s.ChannelMessageSend(m.ChannelID, message)
+	}
+}
+
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	if len(command) < 2 && len(command) > 3 {
+	if len(command) < 2 || len(command) > 3 {
 		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		return
 	}
@@ -213,37 +349,41 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				return
 			}
 
-			query, err := db.Query("SELECT * FROM " + dbTable + " WHERE (guild_id = '" + m.GuildID + "' AND member_id = '" + userID + "');")
+			query, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "' AND member_id = '" + userID + "');")
 			defer query.Close()
-
-			for query.Next() {
-				var memberActivity MemberActivity
-				err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
-				if err != nil {
-					fmt.Println("Unable to parse database information! Aborting. " + err.Error())
-					return
+			if(err == sql.ErrNoRows) {
+				s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
+				return
+			} else {
+				for query.Next() {
+					var memberActivity MemberActivity
+					err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
+					if err != nil {
+						fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+						return
+					}
+					dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+					lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
+					if err != nil {
+						fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+						return
+					}
+					var embed discordgo.MessageEmbed
+					embed.Type = "rich"
+					embed.Title = memberActivity.MemberName
+					embed.Description = "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + memberActivity.Description
+	
+					member, err := s.GuildMember(m.GuildID, userID)
+					if err != nil {
+						s.ChannelMessageSend(m.ChannelID, "Couldn't get the user's guild info... :frowning:")
+						return
+					}
+					var thumbnail discordgo.MessageEmbedThumbnail
+					thumbnail.URL = member.User.AvatarURL("")
+					embed.Thumbnail = &thumbnail
+	
+					s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 				}
-				dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
-				lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
-				if err != nil {
-					fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
-					return
-				}
-				var embed discordgo.MessageEmbed
-				embed.Type = "rich"
-				embed.Title = memberActivity.MemberName
-				embed.Description = "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + memberActivity.Description
-
-				member, err := s.GuildMember(m.GuildID, userID)
-				if err != nil {
-					s.ChannelMessageSend(m.ChannelID, "Couldn't get the user's guild info... :frowning:")
-					return
-				}
-				var thumbnail discordgo.MessageEmbedThumbnail
-				thumbnail.URL = member.User.AvatarURL("")
-				embed.Thumbnail = &thumbnail
-
-				s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 			}
 		}
 	case "list":
@@ -323,7 +463,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		return inactiveUsers
 	}
 
-	results, err := db.Query("SELECT * FROM " + dbTable + " WHERE (guild_id = '" + m.GuildID + "')")
+	results, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "')")
 	defer results.Close()
 
 	if err != nil {

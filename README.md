@@ -12,7 +12,8 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
 5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
 6. (~define functionality) [Get a Lingua API Key.](https://www.linguarobot.io/) The first 2500 requests a day are free.
-6. Set the following information as environment variables on the system you are deploying the bot:
+7. Create a local MySQL or MariaDB database and create a username and password so the bot can access it.
+8. Set the following information as environment variables on the system you are deploying the bot:
    - BOT_TOKEN
    - TWITTER_API_KEY
    - TWITTER_API_SECRET
@@ -20,7 +21,13 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
    - TWITTER_TOKEN_SECRET
    - GOOGLE_API_KEY
    - LINGUA_API_KEY
-7. Call `go run .` to invoke the bot.
+   - DB_USERNAME
+   - DB_PASSWORD
+   - DB
+   - ACTIVITY_TABLE (can be any name)
+   - LEADERBOARD_TABLE (can be any name)
+   - HELLO_GOODBYE_TABLE (can be any name)
+9. Call `go run .` to invoke the bot.
 
 ## Commands
 
@@ -39,6 +46,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~activity user @user: Returns the user's last sign of activity.
 - [x] ~activity rescan: (Should be useless most of the time) Checks for any users in a server that are not in the database, and adds them to it.
 - [x] ~about @user: Get user details related to the Guild the message was called in. 
+- [x] ~leaderboard: Get top 10 (or top x where x is the number of people who have sent a message) users with the highest chat scores. 
   
 ### Dead By Daylight Commands
 - [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
