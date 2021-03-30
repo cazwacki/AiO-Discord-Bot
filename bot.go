@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"database/sql"
 
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
@@ -97,6 +98,21 @@ func initCommandInfo() {
 }
 
 func runBot(token string) {
+	dbUsername = os.Getenv("DB_USERNAME")
+	dbPassword = os.Getenv("DB_PASSWORD")
+	db = os.Getenv("DB")
+	activityTable = os.Getenv("ACTIVITY_TABLE")
+	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
+	
+	// open connection to database
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	defer db.Close()
+	if err != nil {
+		fmt.Println("Unable to open DB connection! " + err.Error())
+		return
+	}
+	connection_pool = db
+
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prodMode = true
@@ -109,12 +125,6 @@ func runBot(token string) {
 		fmt.Println("Error creating discord session")
 		return
 	}
-
-	dbUsername = os.Getenv("DB_USERNAME")
-	dbPassword = os.Getenv("DB_PASSWORD")
-	db = os.Getenv("DB")
-	activityTable = os.Getenv("ACTIVITY_TABLE")
-	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 
 	// add listeners
 	dg.AddHandler(messageCreate)
