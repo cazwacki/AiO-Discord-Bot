@@ -233,7 +233,8 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 			if lastAwarded.Before(time.Now()) {
 				// add points
 				newScore := pointsToAward + leaderboardEntry.Points
-				_, err := db.Query("UPDATE " + leaderboardTable + " SET last_awarded = '" + current_time + "', points = '" + strconv.Itoa(newScore) + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+				query, err := db.Query("UPDATE " + leaderboardTable + " SET last_awarded = '" + current_time + "', points = '" + strconv.Itoa(newScore) + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+				defer query.Close()
 				if err != nil {
 					fmt.Println("Unable to update member's points in database! " + err.Error())
 					return
