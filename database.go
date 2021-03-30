@@ -64,27 +64,21 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
 	}
-
+	
 	if len(description) > 80 {
 		description = description[0:80]
 	}
 
 	if newUser {
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
-		query, err := db.Query("INSERT INTO " + activityTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to insert new user! " + err.Error())
-			return
-		}
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, last_active, description) VALUES ('%s', '%s', '%s', '%s', '%s');",
+			activityTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator, time, description)
+		queryWithoutResults(insertSQL, "Unable to insert new user!", db)
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
-		query, err := db.Query("UPDATE " + activityTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to update user's activity! " + err.Error())
-			return
-		}
+		updateSQL := fmt.Sprintf("UPDATE %s SET last_active = '%s', description = '%s', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
+			activityTable, time, description, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+		queryWithoutResults(updateSQL, "Unable to update user's activity!", db)
 	}
 
 }
@@ -99,11 +93,8 @@ func removeUser(guildID string, userID string) {
 		return
 	}
 
-	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + strings.ReplaceAll(userID, "'", "\\'") + "');")
-	defer query.Close()
-	if err != nil {
-		fmt.Println("Unable to delete user's activity! " + err.Error())
-	}
+	deleteSQL := fmt.Sprintf("DELETE FROM '%s' WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, guildID, userID)
+	queryWithoutResults(deleteSQL, "Unable to delete user's activity!", db)
 }
 
 // loads the provided guild's members into the database.
@@ -182,12 +173,8 @@ func removeGuild(guildID string) {
 		return
 	}
 
-	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
-	defer query.Close()
-	if err != nil {
-		fmt.Println("Unable to delete guild from database! " + err.Error())
-		return
-	}
+	deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", activityTable, guildID)
+	queryWithoutResults(deleteSQL, "Unable to delete guild from database!", db)
 }
 
 // awards a user points for the guild's leaderboard based on the word count formula.
@@ -233,23 +220,27 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 			if lastAwarded.Before(time.Now()) {
 				// add points
 				newScore := pointsToAward + leaderboardEntry.Points
-				query, err := db.Query("UPDATE " + leaderboardTable + " SET last_awarded = '" + current_time + "', points = '" + strconv.Itoa(newScore) + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
-				defer query.Close()
-				if err != nil {
-					fmt.Println("Unable to update member's points in database! " + err.Error())
-					return
-				}
+				updateSQL := fmt.Sprintf("UPDATE %s SET last_awarded = '%s', points = '%d', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
+					leaderboardTable, current_time, newScore, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+				queryWithoutResults(updateSQL, "Unable to update member's points in database!", db)
 			}
 		}
 	}
 		
 	if !foundUser {
-		query, err := db.Query("INSERT INTO " + leaderboardTable + " (guild_id, member_id, member_name, points, last_awarded) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "', '" + strconv.Itoa(pointsToAward) + "', '" + current_time + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to insert new user! " + err.Error())
-			return
-		}
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, points, last_awarded) VALUES ('%s', '%s', '%s', '%d', '%s');",
+			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, pointsToAward, current_time)
+		queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!", db)
+		return
+	}
+}
+
+// helper function for queries we don't need the results for.
+func queryWithoutResults(sql string, errMessage string, db *sql.DB) {
+	query, err := (*db).Query(sql)
+	defer query.Close()
+	if err != nil {
+		fmt.Println(errMessage + " " + err.Error())
 	}
 }
 
