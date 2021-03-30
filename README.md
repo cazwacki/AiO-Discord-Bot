@@ -12,7 +12,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
 5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
 6. (~define functionality) [Get a Lingua API Key.](https://www.linguarobot.io/) The first 2500 requests a day are free.
-7. Create a local MySQL or MariaDB database and create a username and password so the bot can access it.
+7. Create a local MySQL or MariaDB database and create a username, password, and database so the bot can access it.
 8. Set the following information as environment variables on the system you are deploying the bot:
    - BOT_TOKEN
    - TWITTER_API_KEY
