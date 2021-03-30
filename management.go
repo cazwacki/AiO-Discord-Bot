@@ -49,9 +49,7 @@ attempt to rename the specified user.
 func attemptRename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if regex.MatchString(command[1]) && len(command) > 2 {
-		userID := strings.TrimSuffix(command[1], ">")
-		userID = strings.TrimPrefix(userID, "<@")
-		userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+		userID := stripUserID(command[1])
 		err := s.GuildMemberNickname(m.GuildID, userID, strings.Join(command[2:], " "))
 		if err == nil {
 			s.ChannelMessageSend(m.ChannelID, "Done!")
@@ -72,9 +70,7 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
-			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID := stripUserID(command[1])
 			if len(command) > 2 {
 				// dm user why they were kicked
 				reason := strings.Join(command[2:], " ")
@@ -102,9 +98,7 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if len(command) >= 2 {
 		if regex.MatchString(command[1]) {
-			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID := stripUserID(command[1])
 			if len(command) > 2 {
 				// dm user why they were banned
 				reason := strings.Join(command[2:], " ")
@@ -136,6 +130,7 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		}
 		if messageCount < 1 {
 			s.ChannelMessageSend(m.ChannelID, ":frowning: Sorry, you must purge at least 1 message. Try again.")
+			return
 		}
 		for messageCount > 0 {
 			messagesToPurge := 0
@@ -175,9 +170,7 @@ func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		userID := ""
 		if regex.MatchString(command[2]) {
-			userID = strings.TrimSuffix(command[2], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID = stripUserID(command[2])
 		} else {
 			s.ChannelMessageSend(m.ChannelID, "Usage: `~purge <number> (optional: @user)`")
 			return
@@ -412,9 +405,7 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	if len(command) == 2 {
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		if regex.MatchString(command[1]) {
-			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID := stripUserID(command[1])
 
 			fmt.Println(command)
 
@@ -595,18 +586,4 @@ func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 		return
 	}
 	attemptCopy(s, m, command, false)
-}
-
-/**
-Creates an embed showing a user's profile as a bigger image so it is more visible.
-*/
-func handleProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	attemptProfile(s, m, command)
-}
-
-/**
-Provides user details in an embed.
-*/
-func handleAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	attemptAbout(s, m, command)
 }
