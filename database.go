@@ -57,14 +57,14 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	description = strings.ReplaceAll(description, "'", "''")
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
 	}
-	
+
 	if len(description) > 80 {
 		description = description[0:80]
 	}
@@ -85,7 +85,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -117,7 +117,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		after = memberList[len(memberList)-1].User.ID
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -166,7 +166,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 
 // removes the provided guild's members from the database.
 func removeGuild(guildID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
@@ -183,7 +183,7 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 		return
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
@@ -195,7 +195,8 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 
 	pointsToAward := int(math.Floor(math.Pow(float64(wordCount), float64(1)/3)*10 - 10))
 
-	query, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", leaderboardTable, guildID, user.ID)
+	query, err := db.Query(selectSQL)
 	defer query.Close()
 	if err != nil {
 		fmt.Println("Error with SELECT query: " + err.Error())
@@ -255,7 +256,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	if len(command) == 1 {
 		// generate leaderboard of top 10 users with corresponding points, with user's score at the bottom
-		db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+		db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 		defer db.Close()
 		if err != nil {
 			fmt.Println("Unable to open DB connection! " + err.Error())
@@ -263,7 +264,8 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		}
 
 		// 1. Get all members of the guild the command was invoked in and sort by points
-		results, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + m.GuildID + "')")
+		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", leaderboardTable, m.GuildID)
+		results, err := db.Query(selectSQL)
 		defer results.Close()
 	
 		if err != nil {
@@ -328,12 +330,10 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		fmt.Println(command)
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		if regex.MatchString(command[2]) {
-			userID := strings.TrimSuffix(command[2], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID := stripUserID(command[2])
 
 			// parse userID, get it from the db, present info
-			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 			defer db.Close()
 
 			if err != nil {
@@ -341,7 +341,8 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				return
 			}
 
-			query, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "' AND member_id = '" + userID + "');")
+			selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, m.GuildID, userID)
+			query, err := db.Query(selectSQL)
 			defer query.Close()
 			if(err == sql.ErrNoRows) {
 				s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
@@ -447,7 +448,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		return inactiveUsers
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	defer db.Close()
 
 	if err != nil {
@@ -455,7 +456,8 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		return inactiveUsers
 	}
 
-	results, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "')")
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", activityTable, m.GuildID)
+	results, err := db.Query(selectSQL)
 	defer results.Close()
 
 	if err != nil {
