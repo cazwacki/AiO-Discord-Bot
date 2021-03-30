@@ -78,7 +78,7 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
-	deleteSQL := fmt.Sprintf("DELETE FROM '%s' WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, guildID, userID)
+	deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, guildID, userID)
 	queryWithoutResults(deleteSQL, "Unable to delete user's activity!")
 }
 
