@@ -59,10 +59,9 @@ func attemptRename(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 			s.ChannelMessageSend(m.ChannelID, err.Error())
 			fmt.Println(err)
 		}
-	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~nick @<user> <new name>`")
-		fmt.Println(command[1])
+		return
 	}
+	s.ChannelMessageSend(m.ChannelID, "Usage: `~nick @<user> <new name>`")
 }
 
 /**
@@ -89,13 +88,10 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 				s.ChannelMessageSend(m.ChannelID, ":wave: Kicked "+command[1]+".")
 				s.GuildMemberDelete(m.GuildID, userID)
 			}
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~kick @<user> (reason: optional)`")
-			fmt.Println(command[1])
+			return
 		}
-	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~kick @<user> (reason: optional)`")
 	}
+	s.ChannelMessageSend(m.ChannelID, "Usage: `~kick @<user> (reason: optional)`")
 }
 
 /**
@@ -122,13 +118,10 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 				s.ChannelMessageSend(m.ChannelID, ":hammer: Banned "+command[1]+".")
 				s.GuildBanCreate(m.GuildID, userID, 0)
 			}
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~ban @<user> (reason: optional)`")
-			fmt.Println(command[1])
+			return
 		}
-	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~ban @<user> (reason: optional)`")
 	}
+	s.ChannelMessageSend(m.ChannelID, "Usage: `~ban @<user> (reason: optional)`")
 }
 
 /**
@@ -409,12 +402,10 @@ func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []
 			embed.Image = &image
 
 			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
+			return
 		}
-	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
 	}
+	s.ChannelMessageSend(m.ChannelID, "Usage: `~profile @user`")
 }
 
 func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
@@ -479,14 +470,10 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 			if err != nil {
 				fmt.Println("Couldn't send the message... " + err.Error())
 			}
-
-		} else {
-			s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
 			return
 		}
-	} else {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
 	}
+	s.ChannelMessageSend(m.ChannelID, "Usage: `~about @user`")
 }
 
 /**
