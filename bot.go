@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"database/sql"
 
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
@@ -75,7 +76,7 @@ func initCommandInfo() {
 		"uptime":     {"uptime", "Reports the bot's current uptime.", handleUptime},
 		"shutdown":   {"shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", handleShutdown},
 		"invite":     {"invite", "Generates a server invitation valid for 24 hours.", handleInvite},
-		"profile":    {"profile @user", "Shows the profile image of a user in an embed.", handleProfile},
+		"profile":    {"profile @user", "Shows the profile image of a user in an embed.", attemptProfile},
 		"nick":       {"nick @user <nickname>", "Renames the specified user to the provided nickname.", handleNickname},
 		"kick":       {"kick @user (reason: optional)", "Kicks the specified user from the server.", handleKick},
 		"ban":        {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
@@ -90,13 +91,34 @@ func initCommandInfo() {
 		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
 		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
 		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
-		"about":      {"about @user", "Returns guild information about the user", handleAbout},
+		"about":      {"about @user", "Returns guild information about the user", attemptAbout},
 		"activity":   {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
 		"leaderboard":{"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
 	}
 }
 
 func runBot(token string) {
+	dbUsername = os.Getenv("DB_USERNAME")
+	dbPassword = os.Getenv("DB_PASSWORD")
+	db = os.Getenv("DB")
+	activityTable = os.Getenv("ACTIVITY_TABLE")
+	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
+	
+	// open connection to database
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	defer db.Close()
+	if err != nil {
+		fmt.Println("Unable to open DB connection! " + err.Error())
+		return
+	}
+	connection_pool = db
+
+	// create tables if they don't exist
+	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80));", activityTable)
+	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable);
+	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
+	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
+
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prodMode = true
@@ -109,12 +131,6 @@ func runBot(token string) {
 		fmt.Println("Error creating discord session")
 		return
 	}
-
-	dbUsername = os.Getenv("DB_USERNAME")
-	dbPassword = os.Getenv("DB_PASSWORD")
-	db = os.Getenv("DB")
-	activityTable = os.Getenv("ACTIVITY_TABLE")
-	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 
 	// add listeners
 	dg.AddHandler(messageCreate)

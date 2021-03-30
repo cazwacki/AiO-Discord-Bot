@@ -14,6 +14,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var connection_pool *sql.DB
 var dbUsername string
 var dbPassword string
 var db string
@@ -57,53 +58,28 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 
 	description = strings.ReplaceAll(description, "'", "''")
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
-		return
-	}
-
 	if len(description) > 80 {
 		description = description[0:80]
 	}
 
 	if newUser {
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
-		query, err := db.Query("INSERT INTO " + activityTable + " (guild_id, member_id, member_name, last_active, description) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator + "', '" + time + "', '" + description + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to insert new user! " + err.Error())
-			return
-		}
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, last_active, description) VALUES ('%s', '%s', '%s', '%s', '%s');",
+			activityTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator, time, description)
+		queryWithoutResults(insertSQL, "Unable to insert new user!")
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
-		query, err := db.Query("UPDATE " + activityTable + " SET last_active = '" + time + "', description = '" + description + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to update user's activity! " + err.Error())
-			return
-		}
+		updateSQL := fmt.Sprintf("UPDATE %s SET last_active = '%s', description = '%s', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
+			activityTable, time, description, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+		queryWithoutResults(updateSQL, "Unable to update user's activity!")
 	}
 
 }
 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
-		return
-	}
-
-	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + strings.ReplaceAll(userID, "'", "\\'") + "');")
-	defer query.Close()
-	if err != nil {
-		fmt.Println("Unable to delete user's activity! " + err.Error())
-	}
+	deleteSQL := fmt.Sprintf("DELETE FROM '%s' WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, guildID, userID)
+	queryWithoutResults(deleteSQL, "Unable to delete user's activity!")
 }
 
 // loads the provided guild's members into the database.
@@ -126,15 +102,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		after = memberList[len(memberList)-1].User.ID
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
-		return 0
-	}
-
-	results, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
+	results, err := connection_pool.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
 	defer results.Close()
 
 	if err != nil {
@@ -175,31 +143,13 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 
 // removes the provided guild's members from the database.
 func removeGuild(guildID string) {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
-		return
-	}
-
-	query, err := db.Query("DELETE FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
-	defer query.Close()
-	if err != nil {
-		fmt.Println("Unable to delete guild from database! " + err.Error())
-		return
-	}
+	deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", activityTable, guildID)
+	queryWithoutResults(deleteSQL, "Unable to delete guild from database!")
 }
 
 // awards a user points for the guild's leaderboard based on the word count formula.
-func awardPoints(guildID string, user *discordgo.User, current_time string, message string) {
+func awardPoints(guildID string, user *discordgo.User, currentTime string, message string) {
 	if user.Bot {
-		return
-	}
-
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
 	}
 
@@ -208,7 +158,8 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 
 	pointsToAward := int(math.Floor(math.Pow(float64(wordCount), float64(1)/3)*10 - 10))
 
-	query, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", leaderboardTable, guildID, user.ID)
+	query, err := connection_pool.Query(selectSQL)
 	defer query.Close()
 	if err != nil {
 		fmt.Println("Error with SELECT query: " + err.Error())
@@ -233,23 +184,27 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 			if lastAwarded.Before(time.Now()) {
 				// add points
 				newScore := pointsToAward + leaderboardEntry.Points
-				query, err := db.Query("UPDATE " + leaderboardTable + " SET last_awarded = '" + current_time + "', points = '" + strconv.Itoa(newScore) + "', member_name = '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "' WHERE (guild_id = '" + guildID + "' AND member_id = '" + user.ID + "');")
-				defer query.Close()
-				if err != nil {
-					fmt.Println("Unable to update member's points in database! " + err.Error())
-					return
-				}
+				updateSQL := fmt.Sprintf("UPDATE %s SET last_awarded = '%s', points = '%d', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
+					leaderboardTable, currentTime, newScore, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+				queryWithoutResults(updateSQL, "Unable to update member's points in database!")
 			}
 		}
 	}
 		
 	if !foundUser {
-		query, err := db.Query("INSERT INTO " + leaderboardTable + " (guild_id, member_id, member_name, points, last_awarded) VALUES ('" + guildID + "', '" + user.ID + "', '" + strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator + "', '" + strconv.Itoa(pointsToAward) + "', '" + current_time + "');")
-		defer query.Close()
-		if err != nil {
-			fmt.Println("Unable to insert new user! " + err.Error())
-			return
-		}
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, points, last_awarded) VALUES ('%s', '%s', '%s', '%d', '%s');",
+			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, pointsToAward, currentTime)
+		queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!")
+		return
+	}
+}
+
+// helper function for queries we don't need the results for.
+func queryWithoutResults(sql string, errMessage string) {
+	query, err := connection_pool.Query(sql)
+	defer query.Close()
+	if err != nil {
+		fmt.Println(errMessage + " " + err.Error())
 	}
 }
 
@@ -264,15 +219,10 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	if len(command) == 1 {
 		// generate leaderboard of top 10 users with corresponding points, with user's score at the bottom
-		db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-		defer db.Close()
-		if err != nil {
-			fmt.Println("Unable to open DB connection! " + err.Error())
-			return
-		}
-
+		
 		// 1. Get all members of the guild the command was invoked in and sort by points
-		results, err := db.Query("SELECT * FROM " + leaderboardTable + " WHERE (guild_id = '" + m.GuildID + "')")
+		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", leaderboardTable, m.GuildID)
+		results, err := connection_pool.Query(selectSQL)
 		defer results.Close()
 	
 		if err != nil {
@@ -337,20 +287,11 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		fmt.Println(command)
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		if regex.MatchString(command[2]) {
-			userID := strings.TrimSuffix(command[2], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+			userID := stripUserID(command[2])
 
 			// parse userID, get it from the db, present info
-			db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-			defer db.Close()
-
-			if err != nil {
-				fmt.Println("Unable to open DB connection! " + err.Error())
-				return
-			}
-
-			query, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "' AND member_id = '" + userID + "');")
+			selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, m.GuildID, userID)
+			query, err := connection_pool.Query(selectSQL)
 			defer query.Close()
 			if(err == sql.ErrNoRows) {
 				s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
@@ -456,15 +397,8 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		return inactiveUsers
 	}
 
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
-
-	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
-		return inactiveUsers
-	}
-
-	results, err := db.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + m.GuildID + "')")
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", activityTable, m.GuildID)
+	results, err := connection_pool.Query(selectSQL)
 	defer results.Close()
 
 	if err != nil {

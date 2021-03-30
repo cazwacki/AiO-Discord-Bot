@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
@@ -46,4 +47,18 @@ func createField(title string, description string, inline bool) *discordgo.Messa
 	command.Value = description
 	command.Inline = inline
 	return &command
+}
+
+/**
+Strips the characters surrounding a user ID. Heavily used,
+so it warrants a method.
+*/
+func stripUserID(raw string) string {
+	// strip <@ and > surrounding the user ID
+	raw = strings.TrimSuffix(raw, ">")
+	raw = strings.TrimPrefix(raw, "<@")
+
+	// remove the ! if the user has a nickname
+	raw = strings.TrimPrefix(raw, "!")
+	return raw
 }
