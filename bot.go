@@ -113,6 +113,12 @@ func runBot(token string) {
 	}
 	connection_pool = db
 
+	// create tables if they don't exist
+	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80));", activityTable)
+	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable);
+	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
+	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
+
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
 		prodMode = true

@@ -148,7 +148,7 @@ func removeGuild(guildID string) {
 }
 
 // awards a user points for the guild's leaderboard based on the word count formula.
-func awardPoints(guildID string, user *discordgo.User, current_time string, message string) {
+func awardPoints(guildID string, user *discordgo.User, currentTime string, message string) {
 	if user.Bot {
 		return
 	}
@@ -185,7 +185,7 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 				// add points
 				newScore := pointsToAward + leaderboardEntry.Points
 				updateSQL := fmt.Sprintf("UPDATE %s SET last_awarded = '%s', points = '%d', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
-					leaderboardTable, current_time, newScore, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+					leaderboardTable, currentTime, newScore, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
 				queryWithoutResults(updateSQL, "Unable to update member's points in database!")
 			}
 		}
@@ -193,7 +193,7 @@ func awardPoints(guildID string, user *discordgo.User, current_time string, mess
 		
 	if !foundUser {
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, points, last_awarded) VALUES ('%s', '%s', '%s', '%d', '%s');",
-			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, pointsToAward, current_time)
+			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, pointsToAward, currentTime)
 		queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!")
 		return
 	}
