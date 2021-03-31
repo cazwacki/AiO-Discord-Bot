@@ -3,12 +3,12 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-	"math"
-	"sort"
 
 	"github.com/bwmarrin/discordgo"
 	_ "github.com/go-sql-driver/mysql"
@@ -20,6 +20,7 @@ var dbPassword string
 var db string
 var activityTable string
 var leaderboardTable string
+var joinLeaveTable string
 
 type MemberActivity struct {
 	ID          int    `json:"entry"`
@@ -31,12 +32,12 @@ type MemberActivity struct {
 }
 
 type LeaderboardEntry struct {
-	ID              int    `json:"entry"`
-	GuildID         string `json:"guild_id"`
-	MemberID        string `json:"member_id"`
-	MemberName      string `json:"member_name"`
-	Points          int    `json:"points"`
-	LastAwarded     string `json:"last_awarded"`
+	ID          int    `json:"entry"`
+	GuildID     string `json:"guild_id"`
+	MemberID    string `json:"member_id"`
+	MemberName  string `json:"member_name"`
+	Points      int    `json:"points"`
+	LastAwarded string `json:"last_awarded"`
 }
 
 type InactiveSet struct {
@@ -65,12 +66,12 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 	if newUser {
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, last_active, description) VALUES ('%s', '%s', '%s', '%s', '%s');",
-			activityTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")  + "#" + user.Discriminator, time, description)
+			activityTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, time, description)
 		queryWithoutResults(insertSQL, "Unable to insert new user!")
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
 		updateSQL := fmt.Sprintf("UPDATE %s SET last_active = '%s', description = '%s', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
-			activityTable, time, description, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+			activityTable, time, description, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, guildID, user.ID)
 		queryWithoutResults(updateSQL, "Unable to update user's activity!")
 	}
 
@@ -103,12 +104,11 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 	}
 
 	results, err := connection_pool.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
-	defer results.Close()
-
 	if err != nil {
 		fmt.Println("Unable to read database for existing users in the guild! " + err.Error())
 		return 0
 	}
+	defer results.Close()
 
 	// loop through members in the database and store them in an array
 	var memberActivities []MemberActivity
@@ -160,11 +160,11 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", leaderboardTable, guildID, user.ID)
 	query, err := connection_pool.Query(selectSQL)
-	defer query.Close()
 	if err != nil {
 		fmt.Println("Error with SELECT query: " + err.Error())
 	}
-	
+	defer query.Close()
+
 	foundUser := false
 	for query.Next() {
 		foundUser = true
@@ -185,15 +185,15 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 				// add points
 				newScore := pointsToAward + leaderboardEntry.Points
 				updateSQL := fmt.Sprintf("UPDATE %s SET last_awarded = '%s', points = '%d', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
-					leaderboardTable, currentTime, newScore, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, guildID, user.ID)
+					leaderboardTable, currentTime, newScore, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, guildID, user.ID)
 				queryWithoutResults(updateSQL, "Unable to update member's points in database!")
 			}
 		}
 	}
-		
+
 	if !foundUser {
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, points, last_awarded) VALUES ('%s', '%s', '%s', '%d', '%s');",
-			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'") + "#" + user.Discriminator, pointsToAward, currentTime)
+			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, pointsToAward, currentTime)
 		queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!")
 		return
 	}
@@ -202,10 +202,10 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 // helper function for queries we don't need the results for.
 func queryWithoutResults(sql string, errMessage string) {
 	query, err := connection_pool.Query(sql)
-	defer query.Close()
 	if err != nil {
 		fmt.Println(errMessage + " " + err.Error())
 	}
+	defer query.Close()
 }
 
 /****
@@ -219,16 +219,15 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	if len(command) == 1 {
 		// generate leaderboard of top 10 users with corresponding points, with user's score at the bottom
-		
+
 		// 1. Get all members of the guild the command was invoked in and sort by points
 		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", leaderboardTable, m.GuildID)
 		results, err := connection_pool.Query(selectSQL)
-		defer results.Close()
-	
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Unable to read database for existing users in the guild! " + err.Error())
+			s.ChannelMessageSend(m.ChannelID, "Unable to read database for existing users in the guild! "+err.Error())
 			return
 		}
+		defer results.Close()
 
 		// create array of users
 		var leaderboardEntries []LeaderboardEntry
@@ -250,7 +249,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		message := "```perl\n"
 		// 2. Create a for loop codesnippet message showing the names and ranks of top 10s
 		for i := 0; i < len(leaderboardEntries) && i < 10; i++ {
-			message += fmt.Sprintf("%d.\t%s\n\t\tPoints: %d\n", (i+1), leaderboardEntries[i].MemberName, leaderboardEntries[i].Points)
+			message += fmt.Sprintf("%d.\t%s\n\t\tPoints: %d\n", (i + 1), leaderboardEntries[i].MemberName, leaderboardEntries[i].Points)
 		}
 
 		var authorEntry LeaderboardEntry
@@ -293,7 +292,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, m.GuildID, userID)
 			query, err := connection_pool.Query(selectSQL)
 			defer query.Close()
-			if(err == sql.ErrNoRows) {
+			if err == sql.ErrNoRows {
 				s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
 				return
 			} else {
@@ -314,7 +313,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 					embed.Type = "rich"
 					embed.Title = memberActivity.MemberName
 					embed.Description = "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + memberActivity.Description
-	
+
 					member, err := s.GuildMember(m.GuildID, userID)
 					if err != nil {
 						s.ChannelMessageSend(m.ChannelID, "Couldn't get the user's guild info... :frowning:")
@@ -323,7 +322,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 					var thumbnail discordgo.MessageEmbedThumbnail
 					thumbnail.URL = member.User.AvatarURL("")
 					embed.Thumbnail = &thumbnail
-	
+
 					s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 				}
 			}
@@ -399,12 +398,11 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", activityTable, m.GuildID)
 	results, err := connection_pool.Query(selectSQL)
-	defer results.Close()
-
 	if err != nil {
 		fmt.Println("Unable to read database for existing users in the guild! " + err.Error())
 		return inactiveUsers
 	}
+	defer results.Close()
 
 	// loop through members in the database and store them in an array
 	dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"

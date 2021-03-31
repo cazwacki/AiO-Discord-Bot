@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/url"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-	"database/sql"
 
 	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
@@ -73,27 +73,27 @@ Initialize command information and prefix
 func initCommandInfo() {
 	prefix = "~"
 	commandList = map[string]command{
-		"uptime":     {"uptime", "Reports the bot's current uptime.", handleUptime},
-		"shutdown":   {"shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", handleShutdown},
-		"invite":     {"invite", "Generates a server invitation valid for 24 hours.", handleInvite},
-		"profile":    {"profile @user", "Shows the profile image of a user in an embed.", attemptProfile},
-		"nick":       {"nick @user <nickname>", "Renames the specified user to the provided nickname.", handleNickname},
-		"kick":       {"kick @user (reason: optional)", "Kicks the specified user from the server.", handleKick},
-		"ban":        {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
-		"mv":         {"mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", handleMove},
-		"cp":         {"cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", handleCopy},
-		"purge":      {"purge <number> (optional: @user)", "Removes the <number> most recent messages from the channel.", handlePurge},
-		"define":     {"define <word/phrase>", "Returns a definition of the word/phrase if it is available.", handleDefine},
-		"google":     {"google <word/phrase>", "Returns the first five google results returned from the query.", handleGoogle},
-		"image":      {"image <word/phrase>", "Returns the first image from Google Images.", handleImage},
-		"perk":       {"perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", handlePerk},
-		"shrine":     {"shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", handleShrine},
-		"autoshrine": {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
-		"help":       {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
-		"wiki":       {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
-		"about":      {"about @user", "Returns guild information about the user", attemptAbout},
-		"activity":   {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
-		"leaderboard":{"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
+		"uptime":      {"uptime", "Reports the bot's current uptime.", handleUptime},
+		"shutdown":    {"shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", handleShutdown},
+		"invite":      {"invite", "Generates a server invitation valid for 24 hours.", handleInvite},
+		"profile":     {"profile @user", "Shows the profile image of a user in an embed.", attemptProfile},
+		"nick":        {"nick @user <nickname>", "Renames the specified user to the provided nickname.", handleNickname},
+		"kick":        {"kick @user (reason: optional)", "Kicks the specified user from the server.", handleKick},
+		"ban":         {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
+		"mv":          {"mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", handleMove},
+		"cp":          {"cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", handleCopy},
+		"purge":       {"purge <number> (optional: @user)", "Removes the <number> most recent messages from the channel.", handlePurge},
+		"define":      {"define <word/phrase>", "Returns a definition of the word/phrase if it is available.", handleDefine},
+		"google":      {"google <word/phrase>", "Returns the first five google results returned from the query.", handleGoogle},
+		"image":       {"image <word/phrase>", "Returns the first image from Google Images.", handleImage},
+		"perk":        {"perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", handlePerk},
+		"shrine":      {"shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", handleShrine},
+		"autoshrine":  {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
+		"help":        {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
+		"wiki":        {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
+		"about":       {"about @user", "Returns guild information about the user", attemptAbout},
+		"activity":    {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
+		"leaderboard": {"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
 	}
 }
 
@@ -103,21 +103,24 @@ func runBot(token string) {
 	db = os.Getenv("DB")
 	activityTable = os.Getenv("ACTIVITY_TABLE")
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
-	
+	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
+
 	// open connection to database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	defer db.Close()
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
 	}
+	defer db.Close()
 	connection_pool = db
 
 	// create tables if they don't exist
 	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80));", activityTable)
-	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable);
+	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable)
+	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
 	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
 	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
+	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
@@ -160,7 +163,7 @@ func runBot(token string) {
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
-	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
+	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
 	// Cleanly close down the Discord session and Twitter connection.
