@@ -341,8 +341,8 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 
 		channel := strings.ReplaceAll(command[3], "<#", "")
 		channel = strings.ReplaceAll(channel, ">", "")
-		_, err := strconv.Atoi(channel)
-		if err != nil || len(channel) != 18 {
+		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
+		if !matched {
 			s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
 			return
 		}
