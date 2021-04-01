@@ -92,6 +92,53 @@ func removeUser(guildID string, userID string) {
 	queryWithoutResults(deleteSQL, "Unable to delete user's activity!")
 }
 
+// sends the guild's join/leave message when a user enters/leaves the server.
+func joinLeaveMessage(s *discordgo.Session, guildID string, user *discordgo.User, messageType string) {
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, guildID, messageType)
+	query, err := connection_pool.Query(selectSQL)
+	if err != nil {
+		fmt.Println("Error with SELECT query: " + err.Error())
+	}
+	defer query.Close()
+
+	guild, err := s.State.Guild(guildID)
+	if err != nil {
+		fmt.Println("Unable to retrieve the guild! " + err.Error())
+		return
+	}
+
+	sUser := user.Username
+	sDisc := user.Discriminator
+	sPing := fmt.Sprintf("<@%s>", user.ID)
+	sMemc := guild.MemberCount
+
+	for query.Next() {
+		// write and send embed
+		var greeterMessage GreeterMessage
+		err = query.Scan(&greeterMessage.ID, &greeterMessage.GuildID, &greeterMessage.ChannelID, &greeterMessage.MessageType, &greeterMessage.ImageLink, &greeterMessage.Message)
+		if err != nil {
+			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			return
+		}
+
+		// do all code substitutions
+		greeterMessage.Message = strings.ReplaceAll(greeterMessage.Message, "<<user>>", sUser)
+		greeterMessage.Message = strings.ReplaceAll(greeterMessage.Message, "<<disc>>", sDisc)
+		greeterMessage.Message = strings.ReplaceAll(greeterMessage.Message, "<<ping>>", sPing)
+		greeterMessage.Message = strings.ReplaceAll(greeterMessage.Message, "<<memc>>", strconv.Itoa(sMemc))
+
+		var embed discordgo.MessageEmbed
+		embed.Type = "rich"
+		embed.Description = greeterMessage.Message
+
+		var image discordgo.MessageEmbedImage
+		image.URL = greeterMessage.ImageLink
+		embed.Image = &image
+
+		s.ChannelMessageSendEmbed(greeterMessage.ChannelID, &embed)
+	}
+}
+
 // loads the provided guild's members into the database.
 func logNewGuild(s *discordgo.Session, guildID string) int {
 

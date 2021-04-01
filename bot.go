@@ -107,7 +107,7 @@ func runBot(token string) {
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 
 	// open connection to database
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
@@ -144,7 +144,7 @@ func runBot(token string) {
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(guildDelete)
 
-	*dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers
+	*dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers | discordgo.IntentsGuilds
 
 	// open connection to discord
 	err = dg.Open()
@@ -247,13 +247,13 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	fmt.Println("User was added to guild")
 	go logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
-	go joinMessage(m.GuildID)
+	go joinLeaveMessage(s, m.GuildID, m.User, "join")
 }
 
 func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 	fmt.Println("User was removed from guild")
 	go removeUser(m.GuildID, m.User.ID)
-	go leaveMessage(m.GuildID)
+	go joinLeaveMessage(s, m.GuildID, m.User, "leave")
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
