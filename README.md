@@ -47,6 +47,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~activity rescan: (Should be useless most of the time) Checks for any users in a server that are not in the database, and adds them to it.
 - [x] ~about @user: Get user details related to the Guild the message was called in. 
 - [x] ~leaderboard: Get top 10 (or top x where x is the number of people who have sent a message) users with the highest chat scores. 
+- [x] ~greeter help: Provides information on how to set messages to be sent on members entering / exiting a server. 
   
 ### Dead By Daylight Commands
 - [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
