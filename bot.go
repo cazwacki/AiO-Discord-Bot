@@ -94,6 +94,7 @@ func initCommandInfo() {
 		"about":       {"about @user", "Returns guild information about the user", attemptAbout},
 		"activity":    {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
 		"leaderboard": {"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
+		"greeter":     {"greeter", "Allows a guild owner to customize the welcome and goodbye messages sent when a user joins / leaves the guild", greeter},
 	}
 }
 
@@ -106,7 +107,7 @@ func runBot(token string) {
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 
 	// open connection to database
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	if err != nil {
 		fmt.Println("Unable to open DB connection! " + err.Error())
 		return
@@ -245,12 +246,14 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 	fmt.Println("User was added to guild")
-	logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
+	go logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
+	go joinMessage(m.GuildID)
 }
 
 func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 	fmt.Println("User was removed from guild")
-	removeUser(m.GuildID, m.User.ID)
+	go removeUser(m.GuildID, m.User.ID)
+	go leaveMessage(m.GuildID)
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {

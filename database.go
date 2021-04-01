@@ -40,6 +40,15 @@ type LeaderboardEntry struct {
 	LastAwarded string `json:"last_awarded"`
 }
 
+type GreeterMessage struct {
+	ID          int    `json:"entry"`
+	GuildID     string `json:"guild_id"`
+	ChannelID   string `json:"channel_id"`
+	MessageType string `json:"message_type"`
+	ImageLink   string `json:"image_link"`
+	Message     string `json:"message"`
+}
+
 type InactiveSet struct {
 	DaysInactive int
 	Message      *discordgo.Message
@@ -211,6 +220,124 @@ func queryWithoutResults(sql string, errMessage string) {
 /****
 COMMANDS
 ****/
+func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
+		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage this.")
+		return
+	}
+	if len(command) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		return
+	}
+	switch command[1] {
+	case "help":
+		var embed discordgo.MessageEmbed
+		embed.Type = "rich"
+		embed.Title = "Greeter Commands"
+		embed.Description = "The greeter has a few codes you can use to substitute server / user data in your message!\n```Codes:\n\t<<user>> -> username\n\t<<disc>> -> discriminator\n\t<<ping>> -> @user\n\t<<memc>> -> member count```\nExample:\n`Welcome, <<ping>>! <<user>>#<<disc>> is member <<memc>> on the server!` becomes `Welcome, @sage! sage#5429 is member 53 on the server!`"
+
+		var contents []*discordgo.MessageEmbedField
+		contents = append(contents, createField("~greeter help", "Explains how to use the codes and different commands.", false))
+		contents = append(contents, createField("~greeter status", "Displays the current welcome and goodbye messages' information, if present.", false))
+		contents = append(contents, createField("~greeter set (join/leave) #channel message(max: 1000 characters) (optional: -img (image URL (max 1000 characters)))", "Adds (or updates) an entry for the guild to send the new message when a user joins/leaves.", false))
+		contents = append(contents, createField("~greeter reset (join/leave)", "Removes the join/leave message completely. It will no longer send the corresponding message until you set a message again using `~greeter set`.", false))
+		embed.Fields = contents
+
+		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	case "status":
+		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", joinLeaveTable, m.GuildID)
+		query, err := connection_pool.Query(selectSQL)
+		if err != nil {
+			fmt.Println("Error with SELECT query: " + err.Error())
+		}
+		defer query.Close()
+
+		postedMessages := false
+		for query.Next() {
+			postedMessages = true
+			var greeterMessage GreeterMessage
+			err = query.Scan(&greeterMessage.ID, &greeterMessage.GuildID, &greeterMessage.ChannelID, &greeterMessage.MessageType, &greeterMessage.ImageLink, &greeterMessage.Message)
+			if err != nil {
+				fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+				return
+			}
+
+			var embed discordgo.MessageEmbed
+			embed.Type = "rich"
+			embed.Title = fmt.Sprintf("%s Message", strings.Title(greeterMessage.MessageType))
+
+			var contents []*discordgo.MessageEmbedField
+			contents = append(contents, createField("Message", greeterMessage.Message, false))
+			contents = append(contents, createField("Channel", fmt.Sprintf("<#%s>", greeterMessage.ChannelID), false))
+			imageLink := "N/A"
+			if greeterMessage.ImageLink != "" {
+				imageLink = greeterMessage.ImageLink
+			}
+			contents = append(contents, createField("Image", imageLink, false))
+			embed.Fields = contents
+
+			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		}
+
+		if !postedMessages {
+			s.ChannelMessageSend(m.ChannelID, "This server currently has no greeter messages!")
+		}
+	case "set":
+		if len(command) <= 5 {
+			s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+			return
+		}
+		if command[2] != "join" && command[2] != "leave" {
+			s.ChannelMessageSend(m.ChannelID, "You must specify whether you are setting the join or leave message.")
+			return
+		}
+
+		channel := strings.ReplaceAll(command[3], "<#", "")
+		channel = strings.ReplaceAll(channel, ">", "")
+		_, err := strconv.Atoi(channel)
+		if err != nil || len(channel) != 18 {
+			s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+		}
+
+		message := ""
+		imageURL := ""
+		if command[len(command)-2] == "-img" {
+			message = strings.Join(command[4:len(command)-2], " ")
+			imageURL = command[len(command)-1]
+		} else {
+			message = strings.Join(command[4:], " ")
+		}
+		message = strings.ReplaceAll(message, "'", "\\'")
+		imageURL = strings.ReplaceAll(imageURL, "'", "\\'")
+
+		// remove old message if it exists
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, m.GuildID, command[2])
+		queryWithoutResults(deleteSQL, fmt.Sprintf("Unable to delete old %s message!", command[2]))
+
+		// add new message
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, channel_id, message_type, image_link, message) VALUES ('%s', '%s', '%s', '%s', '%s');",
+			joinLeaveTable, m.GuildID, channel, command[2], imageURL, message)
+		queryWithoutResults(insertSQL, fmt.Sprintf("Unable to set new %s message!", command[2]))
+
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
+	case "reset":
+		if len(command) != 3 {
+			s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+			return
+		}
+		if command[2] != "join" && command[2] != "leave" {
+			s.ChannelMessageSend(m.ChannelID, "You must specify whether you are resetting the join or leave message.")
+			return
+		}
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, m.GuildID, command[2])
+		queryWithoutResults(deleteSQL, "Unable to delete the message!")
+		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed message when user %ss.", command[2]))
+	default:
+		s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		return
+	}
+}
+
 func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) > 1 {
 		s.ChannelMessageSend(m.ChannelID, "Usages: ```~leaderboard```")
