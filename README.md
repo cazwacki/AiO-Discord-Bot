@@ -26,7 +26,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
    - DB
    - ACTIVITY_TABLE (can be any name)
    - LEADERBOARD_TABLE (can be any name)
-   - HELLO_GOODBYE_TABLE (can be any name)
+   - JOIN_LEAVE_TABLE (can be any name)
 9. Call `go run .` to invoke the bot.
 
 ## Commands
