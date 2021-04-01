@@ -344,6 +344,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		_, err := strconv.Atoi(channel)
 		if err != nil || len(channel) != 18 {
 			s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+			return
 		}
 
 		message := ""
