@@ -195,7 +195,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 
-	embed.Title = "❓ How to Use SageBot ❓"
+	embed.Title = "❓ How to Use AiO Bot ❓"
 
 	// add a cute thumbnail
 	var thumbnail discordgo.MessageEmbedThumbnail
@@ -203,7 +203,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	embed.Thumbnail = &thumbnail
 
 	// add all commands to the embed as a set of fields that are not inline
-	embed.Description = "The commands are listed on the [Github page](https://github.com/cazwacki/PersonalDiscordBot#commands) for this bot now!"
+	embed.Description = "[Command List](https://cazwacki.github.io/bot-commands.html)"
 
 	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
