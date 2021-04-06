@@ -26,9 +26,7 @@ var commandList map[string]command
 type handler func(*discordgo.Session, *discordgo.MessageCreate, []string)
 
 type command struct {
-	invoke_format string
-	description   string
-	handle        handler
+	handle handler
 }
 
 func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
@@ -73,28 +71,27 @@ Initialize command information and prefix
 func initCommandInfo() {
 	prefix = "~"
 	commandList = map[string]command{
-		"uptime":      {"uptime", "Reports the bot's current uptime.", handleUptime},
-		"shutdown":    {"shutdown", "Shuts the bot down cleanly. Note that if the bot is deployed on an automatic service such as Heroku it will automatically restart.", handleShutdown},
-		"invite":      {"invite", "Generates a server invitation valid for 24 hours.", handleInvite},
-		"profile":     {"profile @user", "Shows the profile image of a user in an embed.", attemptProfile},
-		"nick":        {"nick @user <nickname>", "Renames the specified user to the provided nickname.", handleNickname},
-		"kick":        {"kick @user (reason: optional)", "Kicks the specified user from the server.", handleKick},
-		"ban":         {"ban @user (reason:optional)", "Bans the specified user from the server.", handleBan},
-		"mv":          {"mv <number> <#channel>", "Moves the last <number> messages from the channel it is invoked in and moves them to <#channel>.", handleMove},
-		"cp":          {"cp <number> <#channel>", "Copies the last <number> messages from the channel it is invoked in and pastes them to <#channel>.", handleCopy},
-		"purge":       {"purge <number> (optional: @user)", "Removes the <number> most recent messages from the channel.", handlePurge},
-		"define":      {"define <word/phrase>", "Returns a definition of the word/phrase if it is available.", handleDefine},
-		"google":      {"google <word/phrase>", "Returns the first five google results returned from the query.", handleGoogle},
-		"image":       {"image <word/phrase>", "Returns the first image from Google Images.", handleImage},
-		"perk":        {"perk <perk name>", "Returns the description of the specified Dead by Daylight perk.", handlePerk},
-		"shrine":      {"shrine", "Returns the current shrine according to the Dead by Daylight Wiki.", handleShrine},
-		"autoshrine":  {"autoshrine <#channel>", "Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.", handleAutoshrine},
-		"help":        {"help", "Returns how to use each of the commands the bot has available.", handleHelp},
-		"wiki":        {"wiki <word/phrase>", "Returns the extract from the corresponding Wikipedia page.", handleWiki},
-		"about":       {"about @user", "Returns guild information about the user", attemptAbout},
-		"activity":    {"activity (list/purge <x>)/rescan", "Lists/purges users who have been inactive for <x> days or scans the guild for untracked members", activity},
-		"leaderboard": {"leaderboard", "Lists the top 10 (or however many users have spoken if < 10) users on the leaderboard, then lists the requestors score", leaderboard},
-		"greeter":     {"greeter", "Allows a guild owner to customize the welcome and goodbye messages sent when a user joins / leaves the guild", greeter},
+		"shutdown":    {handleShutdown},
+		"invite":      {handleInvite},
+		"profile":     {attemptProfile},
+		"nick":        {handleNickname},
+		"kick":        {handleKick},
+		"ban":         {handleBan},
+		"mv":          {handleMove},
+		"cp":          {handleCopy},
+		"purge":       {handlePurge},
+		"define":      {handleDefine},
+		"google":      {handleGoogle},
+		"image":       {handleImage},
+		"perk":        {handlePerk},
+		"shrine":      {handleShrine},
+		"autoshrine":  {handleAutoshrine},
+		"help":        {handleHelp},
+		"wiki":        {handleWiki},
+		"about":       {attemptAbout},
+		"activity":    {activity},
+		"leaderboard": {leaderboard},
+		"greeter":     {greeter},
 	}
 }
 
