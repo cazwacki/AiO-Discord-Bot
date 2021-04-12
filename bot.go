@@ -84,6 +84,7 @@ func initCommandInfo() {
 		"urban":       {handleUrban},
 		"google":      {handleGoogle},
 		"image":       {handleImage},
+		"convert":     {handleConvert},
 		"perk":        {handlePerk},
 		"shrine":      {handleShrine},
 		"autoshrine":  {handleAutoshrine},
