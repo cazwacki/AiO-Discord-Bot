@@ -264,7 +264,7 @@ Takes a passed in time and uses the Discord embed timestamp feature to convert i
 */
 func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) != 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <timezone>`\nThe website below has the usable time zones for conversions.")
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.")
 		s.ChannelMessageSend(m.ChannelID, "`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
 		return
 	}
