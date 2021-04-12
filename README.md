@@ -12,8 +12,9 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
 5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
 6. (~define functionality) [Get a Lingua API Key.](https://www.linguarobot.io/) The first 2500 requests a day are free.
-7. Create a local MySQL or MariaDB database and create a username, password, and database so the bot can access it.
-8. Set the following information as environment variables on the system you are deploying the bot:
+7. (~urban functionality) [Get an unofficial Urban Dictionary API Key.](https://rapidapi.com/community/api/urban-dictionary)
+8. Create a local MySQL or MariaDB database and create a username, password, and database so the bot can access it.
+9. Set the following information as environment variables on the system you are deploying the bot:
    - BOT_TOKEN
    - TWITTER_API_KEY
    - TWITTER_API_SECRET
@@ -21,13 +22,14 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
    - TWITTER_TOKEN_SECRET
    - GOOGLE_API_KEY
    - LINGUA_API_KEY
+   - URBAN_DICTIONARY_API_KEY
    - DB_USERNAME
    - DB_PASSWORD
    - DB
    - ACTIVITY_TABLE (can be any name)
    - LEADERBOARD_TABLE (can be any name)
    - JOIN_LEAVE_TABLE (can be any name)
-9. Call `go run .` to invoke the bot.
+10. Call `go run .` to invoke the bot.
 
 ## Commands
 
@@ -57,6 +59,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 ### Lookup Commands
 - [x] ~define (word / phrase): Returns a definition of the word / phrase if it is available.
 - [x] ~wiki (word / phrase): Returns the extract of the topic from Wikipedia if it is available.
+- [x] ~urban (word / phrase): Returns the first five definitions of a word / phrase from Urban Dictionary if available.
 - [x] ~google (word / phrase): Returns the first five results from Google Search Engine.
 - [x] ~image (word / phrase): Returns the first image from Google Search Engine
 - [x] ~help: Returns how to use each of the commands the bot has available.
