@@ -81,6 +81,7 @@ func initCommandInfo() {
 		"cp":          {handleCopy},
 		"purge":       {handlePurge},
 		"define":      {handleDefine},
+		"urban":       {handleUrban},
 		"google":      {handleGoogle},
 		"image":       {handleImage},
 		"perk":        {handlePerk},

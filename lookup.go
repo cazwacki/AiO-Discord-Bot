@@ -36,6 +36,24 @@ type URLSet struct {
 	Page string `json:"page"`
 }
 
+type UrbanResults struct {
+	UrbanEntries []UrbanEntry `json:"list"`
+}
+
+type UrbanEntry struct {
+	Definition  string   `json:"definition"`
+	Permalink   string   `json:"permalink"`
+	ThumbsUp    int      `json:"thumbs_up"`
+	SoundUrls   []string `json:"sound_urls"`
+	Author      string   `json:"author"`
+	Word        string   `json:"word"`
+	DefID       int      `json:"defid"`
+	CurrentVote string   `json:"current_vote"`
+	WrittenOn   string   `json:"written_on"`
+	Example     string   `json:"example"`
+	ThumbsDown  int      `json:"thumbs_down"`
+}
+
 // JSON Structs for Lingua Bot
 type DictResults struct {
 	Entries []Entry `json:"entries"`
@@ -108,6 +126,40 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 	return results
 }
 
+func fetchUrbanDefinitions(query string) UrbanResults {
+	var urbanDefinitions UrbanResults
+
+	// fetch response from lingua robot API
+	url := "https://mashape-community-urban-dictionary.p.rapidapi.com/define?term=" + query
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Println("Error initializing request!")
+		return urbanDefinitions
+	}
+
+	req.Header.Add("x-rapidapi-key", os.Getenv("URBAN_DICTIONARY_API_KEY"))
+	req.Header.Add("x-rapidapi-host", "mashape-community-urban-dictionary.p.rapidapi.com")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println("Error making request!")
+		return urbanDefinitions
+	}
+
+	defer res.Body.Close()
+	body, err := ioutil.ReadAll(res.Body)
+
+	if err != nil {
+		fmt.Println("Error reading response!")
+		return urbanDefinitions
+	}
+
+	// load json response into definitions struct
+	json.Unmarshal(body, &urbanDefinitions)
+	return urbanDefinitions
+}
+
 /**
 Pulls definitions from the Lingua Bot API and returns it as
 an array of Entries.
@@ -120,6 +172,7 @@ func fetchDefinitions(query string) DictResults {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		fmt.Println("Error initializing request!")
 		return definitions
 	}
 
@@ -128,6 +181,7 @@ func fetchDefinitions(query string) DictResults {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		fmt.Println("Error making request!")
 		return definitions
 	}
 
@@ -135,6 +189,7 @@ func fetchDefinitions(query string) DictResults {
 	body, err := ioutil.ReadAll(res.Body)
 
 	if err != nil {
+		fmt.Println("Error reading response!")
 		return definitions
 	}
 
@@ -201,6 +256,53 @@ func fetchArticle(query string) Article {
 	json.Unmarshal(body, &article)
 
 	return article
+}
+
+/**
+Handles a word using the Urban Dictionary and sends the definition(s) back to the channel.
+*/
+func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	// was the command invoked correctly?
+	if len(command) == 1 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~urban <word/phrase>`")
+		return
+	}
+
+	query := url.QueryEscape(strings.Join(command[1:], " "))
+	terms := fetchUrbanDefinitions(query)
+
+	// did the API return any definition?
+	if len(terms.UrbanEntries) == 0 {
+		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here, dawg...")
+		return
+	}
+
+	// construct embed response
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "Urban Definitions for \"" + strings.Join(command[1:], " ") + "\""
+	// var fields []*discordgo.MessageEmbedField
+
+	definitionCount := len(terms.UrbanEntries)
+	if definitionCount > 5 {
+		definitionCount = 5
+	}
+
+	descriptions := ""
+	for i := 0; i < definitionCount; i++ {
+		currentEntry := terms.UrbanEntries[i]
+		cleanedDefinition := strings.ReplaceAll(currentEntry.Definition, "[", "")
+		cleanedDefinition = strings.ReplaceAll(cleanedDefinition, "]", "")
+		descriptions += fmt.Sprintf("**[%d. :thumbsup:+%d, :thumbsdown:-%d](%s)**\n%s\n\n", (i + 1), currentEntry.ThumbsUp, currentEntry.ThumbsDown, currentEntry.Permalink, cleanedDefinition)
+	}
+	embed.Description = descriptions
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "Fetched from Urban Dictionary"
+	footer.IconURL = "https://pbs.twimg.com/profile_images/1149416858426081280/uvwDuyqS_400x400.png"
+	embed.Footer = &footer
+
+	// send response
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 }
 
 /**
