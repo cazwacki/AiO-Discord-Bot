@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
@@ -256,6 +257,75 @@ func fetchArticle(query string) Article {
 	json.Unmarshal(body, &article)
 
 	return article
+}
+
+/**
+Takes a passed in time and uses the Discord embed timestamp feature to convert it to a local time.
+*/
+func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) != 3 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.")
+		s.ChannelMessageSend(m.ChannelID, "`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
+		return
+	}
+
+	cmdTime := command[1]
+	cmdTimezone := command[2]
+
+	cmdTime = strings.ToUpper(cmdTime)
+
+	cmdTimezone = strings.ReplaceAll(cmdTimezone, "_", " ")
+	cmdTimezone = strings.Title(cmdTimezone)
+	cmdTimezone = strings.ReplaceAll(cmdTimezone, " ", "_")
+
+	// convert passed in time to today, then set the time to what was passed in
+	location, err := time.LoadLocation(cmdTimezone)
+	if err != nil {
+		fmt.Println("Error loading location! " + err.Error())
+		s.ChannelMessageSend(m.ChannelID, "Couldn't recognize that timezone.")
+		return
+	}
+	today := time.Now().In(location)
+
+	valid_formats := [6]string{"15:04:05", "3:04:05PM", "15:04", "3:04PM", "15", "3PM"}
+	successful_parse := false
+
+	for _, format := range valid_formats {
+		timeArgument, err := time.Parse(format, cmdTime)
+		if err == nil {
+			today = time.Date(today.Year(), today.Month(), today.Day(), timeArgument.Hour(), timeArgument.Minute(), timeArgument.Second(), today.Nanosecond(), today.Location())
+			successful_parse = true
+		}
+	}
+
+	if !successful_parse {
+		s.ChannelMessageSend(m.ChannelID, "Couldn't parse that time.")
+		return
+	}
+
+	// convert calculated time into utc timestamp for discord
+	discordTimestamp := "2006-01-02T15:04:05.999Z"
+	utc, err := time.LoadLocation("UTC")
+	if err != nil {
+		fmt.Println("Error loading UTC! " + err.Error())
+		s.ChannelMessageSend(m.ChannelID, "Couldn't convert to UTC.")
+		return
+	}
+
+	adjustedTime := today.In(utc)
+	fmt.Println(adjustedTime.Format(discordTimestamp))
+
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+	embed.Title = "Time Conversion"
+	embed.Description = cmdTime + " " + cmdTimezone + " today would be..."
+	embed.Timestamp = adjustedTime.Format(discordTimestamp)
+
+	var footer discordgo.MessageEmbedFooter
+	footer.Text = "...this in your local time:"
+	embed.Footer = &footer
+	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+
 }
 
 /**
