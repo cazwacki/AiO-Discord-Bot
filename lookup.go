@@ -281,7 +281,6 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 	embed.Title = "Urban Definitions for \"" + strings.Join(command[1:], " ") + "\""
-	// var fields []*discordgo.MessageEmbedField
 
 	definitionCount := len(terms.UrbanEntries)
 	if definitionCount > 5 {
@@ -331,18 +330,15 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	var fields []*discordgo.MessageEmbedField
 	for _, entry := range terms.Entries {
 		for _, definition := range entry.Definitions {
-			var field discordgo.MessageEmbedField
-			field.Name = definition.PartOfSpeech + " "
-			field.Value = ""
+			descriptions := ""
 			for index, sense := range definition.Senses {
 				labels := ""
 				if len(sense.Labels) != 0 {
 					labels += "(" + strings.Join(sense.Labels, ", ") + ")"
 				}
-				field.Value += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
+				descriptions += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
 			}
-			field.Inline = false
-			fields = append(fields, &field)
+			fields = append(fields, createField(definition.PartOfSpeech, descriptions, false))
 		}
 	}
 	embed.Fields = fields
