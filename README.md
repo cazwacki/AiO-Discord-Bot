@@ -62,6 +62,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~urban (word / phrase): Returns the first five definitions of a word / phrase from Urban Dictionary if available.
 - [x] ~google (word / phrase): Returns the first five results from Google Search Engine.
 - [x] ~image (word / phrase): Returns the first image from Google Search Engine
+- [x] ~convert (time) (IANA time zone): Returns the local time converted from the time passed in.
 - [x] ~help: Returns how to use each of the commands the bot has available.
 
 ## Things I Have Learned
