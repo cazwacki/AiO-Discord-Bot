@@ -518,18 +518,18 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
-	if len(command) < 2 || len(command) > 3 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
-		return
-	}
+	// if len(command) < 2 || len(command) > 3 {
+	// 	_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+	// 	if err != nil {
+	// 		logError("Failed to send usage message! " + err.Error())
+	// 	}
+	// 	return
+	// }
 
 	switch command[1] {
 	case "rescan":
 		if len(command) != 2 {
-			_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity rescan```")
 			if err != nil {
 				logError("Failed to send usage message! " + err.Error())
 			}
@@ -543,6 +543,13 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 		logSuccess("Found " + strconv.Itoa(membersAdded) + " new users, added them to database, and sent rescan result message")
 	case "user":
+		if len(command) != 3 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity user <@user>```")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
+			return
+		}
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		if regex.MatchString(command[2]) {
 			userID := stripUserID(command[2])
@@ -578,6 +585,10 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 					embed.Title = memberActivity.MemberName
 					embed.Description = "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + memberActivity.Description
 
+					if memberActivity.Whitelisted == 1 {
+						embed.Description += "\n- Protected from auto-kick"
+					}
+
 					member, err := s.GuildMember(m.GuildID, userID)
 					if err != nil {
 						logError("Couldn't pull member information from the session. " + err.Error())
@@ -602,6 +613,13 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			}
 		}
 	case "list":
+		if len(command) != 3 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity list <number of days of inactivity>```")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
+			return
+		}
 		inactiveUsers := getInactiveUsers(s, m, command)
 		daysOfInactivity, err := strconv.Atoi(command[2])
 		if err != nil {
@@ -638,7 +656,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 
 		var contents []*discordgo.MessageEmbedField
-		for i := 0; i < 8 && i < len(inactiveUsers); i++ {
+		for i := 0; i < 6 && i < len(inactiveUsers); i++ {
 			// calculate difference between time.Now() and the provided timestamp
 			dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 			lastActive, err := time.Parse(dateFormat, strings.Split(inactiveUsers[i].LastActive, " m=")[0])
@@ -646,7 +664,12 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				logError("Unable to parse database timestamps! Aborting. " + err.Error())
 				return
 			}
-			contents = append(contents, createField(inactiveUsers[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+inactiveUsers[i].Description, false))
+			fieldValue := "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + inactiveUsers[i].Description
+			// add whitelist state
+			if inactiveUsers[i].Whitelisted == 1 {
+				fieldValue += "\n- Protected from auto-kick"
+			}
+			contents = append(contents, createField(inactiveUsers[i].MemberName, fieldValue, false))
 		}
 		embed.Fields = contents
 
@@ -697,6 +720,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			}
 			return
 		}
+		logInfo(strconv.Itoa(daysOfInactivity))
 
 		if daysOfInactivity < 1 {
 			// remove autokick time from table
@@ -712,7 +736,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			// set autokick day count
 			deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
 			queryWithoutResults(deleteSQL, "Unable to delete old entry!")
-			insertSQL := fmt.Sprintf("INSERT INTO %s VALUES (guild_id, days_until_kick) VALUES (%s, %d);", autokickTable, m.GuildID, daysOfInactivity)
+			insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, days_until_kick) VALUES ('%s', %d);", autokickTable, m.GuildID, daysOfInactivity)
 			queryWithoutResults(insertSQL, "Unable to insert new entry!")
 			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
 			if err != nil {
@@ -721,9 +745,53 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			}
 			logSuccess("Updated server in autokick table and notified user")
 		}
-
 	case "whitelist":
 		// ensure user is valid, then toggle that user in memberActivity
+		if len(command) != 4 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity whitelist <@user> (optional: true/false)```")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
+			return
+		}
+
+		userID := stripUserID(command[2])
+		matched, _ := regexp.MatchString(`^[0-9]{18}$`, userID)
+		if !matched {
+			logWarning("User ID '" + userID + "' is invalid")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid User ID was passed in.")
+			if err != nil {
+				logError("Failed to send match failure message! " + err.Error())
+			}
+			return
+		}
+
+		// update user's whitelist state
+		if command[3] != "true" && command[3] != "false" {
+			logWarning("User did not set 'true' or 'false' for the user's whitelist state")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Please mark the whitelist state of the user as 'true' or 'false'.")
+			if err != nil {
+				logError("Failed to send whitelist state error message! " + err.Error())
+			}
+			return
+		}
+		updateSQL := fmt.Sprintf("UPDATE %s SET whitelist = %s WHERE (guild_id = '%s' AND member_id = '%s');",
+			activityTable, command[3], m.GuildID, userID)
+		queryWithoutResults(updateSQL, "Unable to update user's whitelist state!")
+		if command[3] == "true" {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now a member of the autokick whitelist.")
+			if err != nil {
+				logError("Failed to send result message! " + err.Error())
+				return
+			}
+		} else {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now not a member of the autokick whitelist.")
+			if err != nil {
+				logError("Failed to send result message! " + err.Error())
+				return
+			}
+		}
+		logSuccess("Set user's whitelist state")
 	default:
 		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		if err != nil {
