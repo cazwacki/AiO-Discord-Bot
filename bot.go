@@ -72,6 +72,7 @@ Initialize command information and prefix
 func initCommandInfo() {
 	prefix = "~"
 	commandList = map[string]command{
+		"uptime":      {handleUptime},
 		"shutdown":    {handleShutdown},
 		"invite":      {handleInvite},
 		"profile":     {attemptProfile},
