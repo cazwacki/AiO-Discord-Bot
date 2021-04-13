@@ -123,11 +123,12 @@ func fetchResults(query string, resultCount int) []GoogleResult {
 			}
 		}
 	})
-	fmt.Printf("%+v\n", results)
+	logInfo(fmt.Sprintf("%+v\n", results))
 	return results
 }
 
 func fetchUrbanDefinitions(query string) UrbanResults {
+	logInfo("Query: '" + query + "'")
 	var urbanDefinitions UrbanResults
 
 	// fetch response from lingua robot API
@@ -135,7 +136,7 @@ func fetchUrbanDefinitions(query string) UrbanResults {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println("Error initializing request!")
+		logError("Error initializing GET request! " + err.Error())
 		return urbanDefinitions
 	}
 
@@ -144,7 +145,7 @@ func fetchUrbanDefinitions(query string) UrbanResults {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error making request!")
+		fmt.Println("Error performing request! " + err.Error())
 		return urbanDefinitions
 	}
 
@@ -152,12 +153,13 @@ func fetchUrbanDefinitions(query string) UrbanResults {
 	body, err := ioutil.ReadAll(res.Body)
 
 	if err != nil {
-		fmt.Println("Error reading response!")
+		fmt.Println("Error reading response! " + err.Error())
 		return urbanDefinitions
 	}
 
 	// load json response into definitions struct
 	json.Unmarshal(body, &urbanDefinitions)
+	logInfo(fmt.Sprintf("Query Result: %+v\n", urbanDefinitions))
 	return urbanDefinitions
 }
 
@@ -166,6 +168,7 @@ Pulls definitions from the Lingua Bot API and returns it as
 an array of Entries.
 */
 func fetchDefinitions(query string) DictResults {
+	logInfo("Query: '" + query + "'")
 	var definitions DictResults
 
 	// fetch response from lingua robot API
@@ -173,7 +176,7 @@ func fetchDefinitions(query string) DictResults {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		fmt.Println("Error initializing request!")
+		logError("Error initializing request! " + err.Error())
 		return definitions
 	}
 
@@ -182,7 +185,7 @@ func fetchDefinitions(query string) DictResults {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Println("Error making request!")
+		logError("Error making request! " + err.Error())
 		return definitions
 	}
 
@@ -190,13 +193,13 @@ func fetchDefinitions(query string) DictResults {
 	body, err := ioutil.ReadAll(res.Body)
 
 	if err != nil {
-		fmt.Println("Error reading response!")
+		logError("Error reading response! " + err.Error())
 		return definitions
 	}
 
 	// load json response into definitions struct
 	json.Unmarshal(body, &definitions)
-
+	logInfo(fmt.Sprintf("Query Result: %+v\n", definitions))
 	return definitions
 }
 
@@ -204,19 +207,19 @@ func fetchDefinitions(query string) DictResults {
 Uses Google CustomSearch API to generate and return 10 images.
 */
 func fetchImage(query string) ImageSet {
-	fmt.Println("Query: '" + query + "'")
+	logInfo("Query: '" + query + "'")
 	var newset ImageSet
 	client := &http.Client{Transport: &transport.APIKey{Key: os.Getenv("GOOGLE_API_KEY")}}
 
 	svc, err := customsearch.New(client)
 	if err != nil {
-		fmt.Println(err)
+		logError("Failed to initialize customsearch client! " + err.Error())
 		return newset
 	}
 
 	resp, err := svc.Cse.List().Cx("007244931007990492385:f42b7zsrt0k").SearchType("image").Q(query).Do()
 	if err != nil {
-		fmt.Println(err)
+		logError("Failed to pull images from Google CustomSearch API! " + err.Error())
 		return newset
 	}
 
@@ -231,6 +234,7 @@ func fetchImage(query string) ImageSet {
 }
 
 func fetchArticle(query string) Article {
+	logInfo("Query: '" + query + "'")
 	var article Article
 
 	// fetch response from lingua robot API
@@ -238,11 +242,13 @@ func fetchArticle(query string) Article {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		logError("Failed to initialize GET request! " + err.Error())
 		return article
 	}
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
+		logError("Failed to perform GET request! " + err.Error())
 		return article
 	}
 
@@ -250,12 +256,13 @@ func fetchArticle(query string) Article {
 	body, err := ioutil.ReadAll(res.Body)
 
 	if err != nil {
+		logError("Failed to read response body! " + err.Error())
 		return article
 	}
 
 	// load json response into definitions struct
 	json.Unmarshal(body, &article)
-
+	logInfo(fmt.Sprintf("Query Result: %+v\n", article))
 	return article
 }
 
@@ -263,9 +270,16 @@ func fetchArticle(query string) Article {
 Takes a passed in time and uses the Discord embed timestamp feature to convert it to a local time.
 */
 func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	if len(command) != 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.")
-		s.ChannelMessageSend(m.ChannelID, "`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.")
+		if err != nil {
+			logError("Failed to send usage message 1! " + err.Error())
+		}
+		_, err = s.ChannelMessageSend(m.ChannelID, "`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
+		if err != nil {
+			logError("Failed to send usage message 2! " + err.Error())
+		}
 		return
 	}
 
@@ -281,8 +295,11 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	// convert passed in time to today, then set the time to what was passed in
 	location, err := time.LoadLocation(cmdTimezone)
 	if err != nil {
-		fmt.Println("Error loading location! " + err.Error())
-		s.ChannelMessageSend(m.ChannelID, "Couldn't recognize that timezone.")
+		logError("Error loading location! " + err.Error())
+		_, msgErr := s.ChannelMessageSend(m.ChannelID, "Couldn't recognize that timezone.")
+		if msgErr != nil {
+			logError("Failed to send 'unrecognized timezone' message! " + err.Error())
+		}
 		return
 	}
 	today := time.Now().In(location)
@@ -299,7 +316,10 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	}
 
 	if !successful_parse {
-		s.ChannelMessageSend(m.ChannelID, "Couldn't parse that time.")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Couldn't parse that time.")
+		if err != nil {
+			logError("Failed to send 'parse failed' message! " + err.Error())
+		}
 		return
 	}
 
@@ -308,12 +328,15 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	utc, err := time.LoadLocation("UTC")
 	if err != nil {
 		fmt.Println("Error loading UTC! " + err.Error())
-		s.ChannelMessageSend(m.ChannelID, "Couldn't convert to UTC.")
+		_, msgErr := s.ChannelMessageSend(m.ChannelID, "Couldn't convert to UTC.")
+		if msgErr != nil {
+			logError("Failed to send 'unable to load location' message! " + err.Error())
+		}
 		return
 	}
 
 	adjustedTime := today.In(utc)
-	fmt.Println(adjustedTime.Format(discordTimestamp))
+	logInfo(adjustedTime.Format(discordTimestamp))
 
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
@@ -324,17 +347,25 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "...this in your local time:"
 	embed.Footer = &footer
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
+	logSuccess("Sent calculated message")
 }
 
 /**
 Handles a word using the Urban Dictionary and sends the definition(s) back to the channel.
 */
 func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~urban <word/phrase>`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~urban <word/phrase>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 
@@ -343,7 +374,10 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	// did the API return any definition?
 	if len(terms.UrbanEntries) == 0 {
-		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here, dawg...")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here, dawg...")
+		if err != nil {
+			logError("Failed to send 'no definition' message! " + err.Error())
+		}
 		return
 	}
 
@@ -371,16 +405,25 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	embed.Footer = &footer
 
 	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
+	logSuccess("Sent urban definition message")
 }
 
 /**
 Defines a word using the Cambridge dictionary and sends the definition back to the channel.
 */
 func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 
@@ -389,7 +432,10 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 	// did the API return any definition?
 	if len(terms.Entries) == 0 {
-		s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
+		if err != nil {
+			logError("Failed to send 'no definition' message! " + err.Error())
+		}
 		return
 	}
 
@@ -409,8 +455,11 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 				newDescription := fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
 				if len(descriptions)+len(newDescription) <= 1024 {
 					descriptions += newDescription
+				} else {
+					logWarning("Omitting definition due to description length exceeding capacity")
 				}
 			}
+			logInfo("Added definition set")
 			fields = append(fields, createField(definition.PartOfSpeech, descriptions, false))
 		}
 	}
@@ -421,25 +470,37 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Footer = &footer
 
 	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
+	logSuccess("Sent definition message")
 }
 
 /**
 Sends the first five search results for the query input by the user
 */
 func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~google <word / phrase>`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~google <word / phrase>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 	results := fetchResults(strings.Join(command[1:], " "), 5)
-	fmt.Println("Here's the results!")
 
 	// did any results come in?
 	if len(results) == 0 {
-		s.ChannelMessageSend(m.ChannelID, "Unable to fetch Google results. Try again later :frowning:")
+		logWarning("No results came in. Did the website change or were there genuinely no results?")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Unable to fetch Google results. Try again later :frowning:")
+		if err != nil {
+			logError("Failed to send 'failed to find results' message! " + err.Error())
+			return
+		}
 		return
 	}
 
@@ -450,7 +511,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Title = "Search Results for \"" + strings.Join(command[1:], " ") + "\""
 	resultString := ""
 	for i, result := range results {
-		fmt.Printf("result.ResultURL = %s\n", result.ResultURL)
+		logInfo(fmt.Sprintf("result.ResultURL = %s\n", result.ResultURL))
 		resultString += fmt.Sprintf("%d: [%s](%s)\n", (i + 1), result.ResultTitle, result.ResultURL)
 	}
 	embed.Description = resultString
@@ -459,7 +520,12 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
 	embed.Footer = &footer
 	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
+	logSuccess("Sent Google Results")
 }
 
 /**
@@ -469,14 +535,21 @@ to the channel with emotes that can be used to scroll between images.
 func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	// did the user format the command correctly?
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 	result := fetchImage(strings.Join(command[1:], " "))
 
 	// did the search engine return anything?
 	if len(result.Images) == 0 {
-		s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
+		logWarning("No images were found. Is there a problem with the CustomSearch API?")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
+		if err != nil {
+			logError("Failed to send 'no images' message! " + err.Error())
+		}
 		return
 	}
 
@@ -491,27 +564,52 @@ func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	footer.Text = fmt.Sprintf("Image 1 of %d", len(result.Images))
 	footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
 	embed.Footer = &footer
-	message, _ := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
 
 	result.Message = message
 	go appendToGlobalImageSet(s, result)
 
-	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⬅️")
-	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "➡️")
-	s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⏹️")
+	err = s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⬅️")
+	if err != nil {
+		logError("Failed to add reaction to message! " + err.Error())
+		return
+	}
+	err = s.MessageReactionAdd(m.ChannelID, result.Message.ID, "➡️")
+	if err != nil {
+		logError("Failed to add reaction to message! " + err.Error())
+		return
+	}
+	err = s.MessageReactionAdd(m.ChannelID, result.Message.ID, "⏹️")
+	if err != nil {
+		logError("Failed to add reaction to message! " + err.Error())
+		return
+	}
+
+	logSuccess("Returned image set with trackable reactions")
 
 }
 
 func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~wiki <word / phrase>`")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~wiki <word / phrase>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 	query := strings.Join(command[1:], "_")
 	page := fetchArticle(query)
 
 	if page.URLs == nil {
-		s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
+		if err != nil {
+			logError("Failed to send 'no articles' message! " + err.Error())
+		}
+		logSuccess("No articles found, but no errors")
 		return
 	}
 
@@ -535,5 +633,10 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	footer.Text = "Pulled from Wikipedia"
 	footer.IconURL = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Wikipedia-logo-v2-en.svg/1200px-Wikipedia-logo-v2-en.svg.png"
 	embed.Footer = &footer
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
+	logSuccess("Sent user wiki article")
 }

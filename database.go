@@ -97,13 +97,13 @@ func joinLeaveMessage(s *discordgo.Session, guildID string, user *discordgo.User
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, guildID, messageType)
 	query, err := connection_pool.Query(selectSQL)
 	if err != nil {
-		fmt.Println("Error with SELECT query: " + err.Error())
+		logError("SELECT query error, but not stopping execution: " + err.Error())
 	}
 	defer query.Close()
 
 	guild, err := s.State.Guild(guildID)
 	if err != nil {
-		fmt.Println("Unable to retrieve the guild! " + err.Error())
+		logError("Unable to retrieve the guild from session state! " + err.Error())
 		return
 	}
 
@@ -117,7 +117,7 @@ func joinLeaveMessage(s *discordgo.Session, guildID string, user *discordgo.User
 		var greeterMessage GreeterMessage
 		err = query.Scan(&greeterMessage.ID, &greeterMessage.GuildID, &greeterMessage.ChannelID, &greeterMessage.MessageType, &greeterMessage.ImageLink, &greeterMessage.Message)
 		if err != nil {
-			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			logError("Unable to parse database information! Aborting. " + err.Error())
 			return
 		}
 
@@ -135,7 +135,10 @@ func joinLeaveMessage(s *discordgo.Session, guildID string, user *discordgo.User
 		image.URL = greeterMessage.ImageLink
 		embed.Image = &image
 
-		s.ChannelMessageSendEmbed(greeterMessage.ChannelID, &embed)
+		_, err := s.ChannelMessageSendEmbed(greeterMessage.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send message embed. " + err.Error())
+		}
 	}
 }
 
@@ -149,7 +152,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 	for scanning {
 		nextMembers, err := s.GuildMembers(guildID, after, 500)
 		if err != nil {
-			fmt.Println("Unable to scan the full guild... " + err.Error())
+			logError("Unable to scan the full guild! " + err.Error())
 			return 0
 		}
 		if len(nextMembers) < 1000 {
@@ -161,7 +164,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 
 	results, err := connection_pool.Query("SELECT * FROM " + activityTable + " WHERE (guild_id = '" + guildID + "')")
 	if err != nil {
-		fmt.Println("Unable to read database for existing users in the guild! " + err.Error())
+		logError("Unable to read database for existing users in the guild! " + err.Error())
 		return 0
 	}
 	defer results.Close()
@@ -172,7 +175,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 		var memberActivity MemberActivity
 		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
 		if err != nil {
-			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			logError("Unable to parse database information! Aborting. " + err.Error())
 			return 0
 		}
 		memberActivities = append(memberActivities, memberActivity)
@@ -188,6 +191,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 				}
 			}
 			if !memberExistsInDatabase {
+				logInfo("Added " + member.User.ID + "to the activity database for guild " + guildID)
 				go logActivity(guildID, member.User, time.Now().String(), "Detected in a scan", true)
 				membersAddedToDatabase++
 			}
@@ -217,7 +221,7 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", leaderboardTable, guildID, user.ID)
 	query, err := connection_pool.Query(selectSQL)
 	if err != nil {
-		fmt.Println("Error with SELECT query: " + err.Error())
+		logError("SELECT query error, but not stopping execution: " + err.Error())
 	}
 	defer query.Close()
 
@@ -227,13 +231,13 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 		var leaderboardEntry LeaderboardEntry
 		err = query.Scan(&leaderboardEntry.ID, &leaderboardEntry.GuildID, &leaderboardEntry.MemberID, &leaderboardEntry.MemberID, &leaderboardEntry.Points, &leaderboardEntry.LastAwarded)
 		if err != nil {
-			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			logError("Unable to parse database information! Aborting. " + err.Error())
 			return
 		} else {
 			dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 			lastAwarded, err := time.Parse(dateFormat, strings.Split(leaderboardEntry.LastAwarded, " m=")[0])
 			if err != nil {
-				fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+				logError("Unable to parse database timestamps! Aborting. " + err.Error())
 				return
 			}
 			lastAwarded = lastAwarded.Add(time.Second * 3)
@@ -259,7 +263,7 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 func queryWithoutResults(sql string, errMessage string) {
 	query, err := connection_pool.Query(sql)
 	if err != nil {
-		fmt.Println(errMessage + " " + err.Error())
+		logError(errMessage + " " + err.Error())
 	}
 	defer query.Close()
 }
@@ -268,12 +272,19 @@ func queryWithoutResults(sql string, errMessage string) {
 COMMANDS
 ****/
 func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
-		s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage this.")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage this.")
+		if err != nil {
+			logError("Failed to send permissions message! " + err.Error())
+		}
 		return
 	}
 	if len(command) == 1 {
-		s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 	switch command[1] {
@@ -290,12 +301,17 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		contents = append(contents, createField("~greeter reset (join/leave)", "Removes the join/leave message completely. It will no longer send the corresponding message until you set a message again using `~greeter set`.", false))
 		embed.Fields = contents
 
-		s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send instructions message embed! " + err.Error())
+			return
+		}
+		logSuccess("Sent user help embed for greeter")
 	case "status":
 		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", joinLeaveTable, m.GuildID)
 		query, err := connection_pool.Query(selectSQL)
 		if err != nil {
-			fmt.Println("Error with SELECT query: " + err.Error())
+			logWarning("SELECT query error, but not stopping execution: " + err.Error())
 		}
 		defer query.Close()
 
@@ -305,7 +321,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			var greeterMessage GreeterMessage
 			err = query.Scan(&greeterMessage.ID, &greeterMessage.GuildID, &greeterMessage.ChannelID, &greeterMessage.MessageType, &greeterMessage.ImageLink, &greeterMessage.Message)
 			if err != nil {
-				fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+				logError("Unable to parse database information! Aborting. " + err.Error())
 				return
 			}
 
@@ -323,19 +339,36 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			contents = append(contents, createField("Image", imageLink, false))
 			embed.Fields = contents
 
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			if err != nil {
+				logError("Failed to send a greeter status message! " + err.Error())
+				return
+			}
 		}
 
 		if !postedMessages {
-			s.ChannelMessageSend(m.ChannelID, "This server currently has no greeter messages!")
+			_, err := s.ChannelMessageSend(m.ChannelID, "This server currently has no greeter messages!")
+			if err != nil {
+				logError("Failed to send 'no greeter messages' message! " + err.Error())
+				return
+			}
 		}
+		logSuccess("Sent greeter status to user")
 	case "set":
-		if len(command) <= 5 {
-			s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		if len(command) < 5 {
+			logInfo("User did not use enough arguments when calling greeter set")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
 			return
 		}
 		if command[2] != "join" && command[2] != "leave" {
-			s.ChannelMessageSend(m.ChannelID, "You must specify whether you are setting the join or leave message.")
+			logInfo("User did not use 'join' or 'leave' when calling greeter set")
+			_, err := s.ChannelMessageSend(m.ChannelID, "You must specify whether you are setting the join or leave message.")
+			if err != nil {
+				logError("Failed to send greeter set error message! " + err.Error())
+			}
 			return
 		}
 
@@ -343,7 +376,11 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		channel = strings.ReplaceAll(channel, ">", "")
 		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
 		if !matched {
-			s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+			logInfo("User did not specify channel correctly")
+			_, err := s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+			if err != nil {
+				logError("Failed to send greeter set error message! " + err.Error())
+			}
 			return
 		}
 
@@ -367,28 +404,54 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			joinLeaveTable, m.GuildID, channel, command[2], imageURL, message)
 		queryWithoutResults(insertSQL, fmt.Sprintf("Unable to set new %s message!", command[2]))
 
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
+		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
+		if err != nil {
+			logError("Failed to send greeter set success message! " + err.Error())
+			return
+		}
+		logSuccess("Set new greeter message")
 	case "reset":
 		if len(command) != 3 {
-			s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+			logInfo("User did not pass in the correct number of arguments for greeter reset")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+			if err != nil {
+				logError("Failed to send greeter usage message! " + err.Error())
+			}
 			return
 		}
 		if command[2] != "join" && command[2] != "leave" {
-			s.ChannelMessageSend(m.ChannelID, "You must specify whether you are resetting the join or leave message.")
+			logInfo("User did not specify whether the join or leave message was being reset")
+			_, err := s.ChannelMessageSend(m.ChannelID, "You must specify whether you are resetting the join or leave message.")
+			if err != nil {
+				logError("Failed to send reset misuse message! " + err.Error())
+			}
 			return
 		}
 		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, m.GuildID, command[2])
 		queryWithoutResults(deleteSQL, "Unable to delete the message!")
-		s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed message when user %ss.", command[2]))
+		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed message when user %ss, if there was an existing message.", command[2]))
+		if err != nil {
+			logError("Failed to send greeter reset success message! " + err.Error())
+		}
+		logSuccess("Notified user that greeter message is removed")
 	default:
-		s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
-		return
+		_, err := s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
+		if err != nil {
+			logError("Failed to send greeter usage message! " + err.Error())
+			return
+		}
+		logSuccess("Sent usage message to user")
 	}
 }
 
 func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	if len(command) > 1 {
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~leaderboard```")
+		logInfo("User passed in incorrect number of arguments")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~leaderboard```")
+		if err != nil {
+			logError("Failed to send usage message to channel! " + err.Error())
+		}
 		return
 	}
 
@@ -399,7 +462,10 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", leaderboardTable, m.GuildID)
 		results, err := connection_pool.Query(selectSQL)
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Unable to read database for existing users in the guild! "+err.Error())
+			_, msgErr := s.ChannelMessageSend(m.ChannelID, "Unable to read database for existing users in the guild! "+err.Error())
+			if msgErr != nil {
+				logError("Failed to send database error message to channel! " + msgErr.Error())
+			}
 			return
 		}
 		defer results.Close()
@@ -410,7 +476,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			var entry LeaderboardEntry
 			err = results.Scan(&entry.ID, &entry.GuildID, &entry.MemberID, &entry.MemberName, &entry.Points, &entry.LastAwarded)
 			if err != nil {
-				fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+				logError("Unable to parse database information! Aborting. " + err.Error())
 				return
 			}
 			leaderboardEntries = append(leaderboardEntries, entry)
@@ -439,26 +505,42 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		message += fmt.Sprintf("%d. %s\n\tPoints: %d\n```", position, authorEntry.MemberName, authorEntry.Points)
 
 		// 3. send leaderboard
-		s.ChannelMessageSend(m.ChannelID, message)
+		_, err = s.ChannelMessageSend(m.ChannelID, message)
+		if err != nil {
+			logError("Failed to send leaderboard message! " + err.Error())
+			return
+		}
+		logSuccess("Sent leaderboard message")
 	}
 }
 
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	if len(command) < 2 || len(command) > 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 
 	switch command[1] {
 	case "rescan":
 		if len(command) != 2 {
-			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
 			return
 		}
 		membersAdded := logNewGuild(s, m.GuildID)
-		s.ChannelMessageSend(m.ChannelID, "Added "+strconv.Itoa(membersAdded)+" members to the database!")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Added "+strconv.Itoa(membersAdded)+" members to the database!")
+		if err != nil {
+			logError("Failed to send rescan result message! " + err.Error())
+			return
+		}
+		logSuccess("Found " + strconv.Itoa(membersAdded) + " new users, added them to database, and sent rescan result message")
 	case "user":
-		fmt.Println(command)
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 		if regex.MatchString(command[2]) {
 			userID := stripUserID(command[2])
@@ -468,20 +550,25 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			query, err := connection_pool.Query(selectSQL)
 			defer query.Close()
 			if err == sql.ErrNoRows {
-				s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
+				logWarning("User not found in the database. This usually should not happen.")
+				_, msgErr := s.ChannelMessageSend(m.ChannelID, "This user isn't in our database... :frowning:")
+				if msgErr != nil {
+					logError("Failed to send 'failed to find member' message! " + err.Error())
+					return
+				}
 				return
 			} else {
 				for query.Next() {
 					var memberActivity MemberActivity
 					err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
 					if err != nil {
-						fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+						logError("Unable to parse database information! Aborting. " + err.Error())
 						return
 					}
 					dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 					lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
 					if err != nil {
-						fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+						logError("Unable to parse database timestamps! Aborting. " + err.Error())
 						return
 					}
 					var embed discordgo.MessageEmbed
@@ -491,14 +578,24 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 
 					member, err := s.GuildMember(m.GuildID, userID)
 					if err != nil {
-						s.ChannelMessageSend(m.ChannelID, "Couldn't get the user's guild info... :frowning:")
+						logError("Couldn't pull member information from the session. " + err.Error())
+						_, msgErr := s.ChannelMessageSend(m.ChannelID, "Couldn't get the user's guild info... :frowning:")
+						if msgErr != nil {
+							logError("Failed to send rescan result message! " + err.Error())
+							return
+						}
 						return
 					}
 					var thumbnail discordgo.MessageEmbedThumbnail
 					thumbnail.URL = member.User.AvatarURL("")
 					embed.Thumbnail = &thumbnail
 
-					s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+					_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+					if err != nil {
+						logError("Failed to send user activity message! " + err.Error())
+						return
+					}
+					logSuccess("Sent user activity message")
 				}
 			}
 		}
@@ -507,7 +604,12 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		daysOfInactivity, _ := strconv.Atoi(command[2])
 
 		if len(inactiveUsers) == 0 {
-			s.ChannelMessageSend(m.ChannelID, "No user has been inactive for "+strconv.Itoa(daysOfInactivity)+"+ days.")
+			_, err := s.ChannelMessageSend(m.ChannelID, "No user has been inactive for "+strconv.Itoa(daysOfInactivity)+"+ days.")
+			if err != nil {
+				logError("Failed to send 'no users inactive' message! " + err.Error())
+				return
+			}
+			logSuccess("Returned that there were no inactive users")
 			return
 		}
 
@@ -531,7 +633,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 			lastActive, err := time.Parse(dateFormat, strings.Split(inactiveUsers[i].LastActive, " m=")[0])
 			if err != nil {
-				fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+				logError("Unable to parse database timestamps! Aborting. " + err.Error())
 				return
 			}
 			contents = append(contents, createField(inactiveUsers[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+inactiveUsers[i].Description, false))
@@ -543,19 +645,35 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		if len(newSet.Inactives)%8 != 0 {
 			pageCount++
 		}
+		logInfo("Page Count: " + strconv.Itoa(pageCount))
 
 		footer.Text = fmt.Sprintf("Page 1 of %d", pageCount)
 		embed.Footer = &footer
-		message, _ := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-
+		message, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send activity list message! " + err.Error())
+			return
+		}
 		newSet.Message = message
 		go appendToGlobalInactiveSet(s, newSet)
 
-		s.MessageReactionAdd(m.ChannelID, message.ID, "◀️")
-		s.MessageReactionAdd(m.ChannelID, message.ID, "▶️")
+		err = s.MessageReactionAdd(m.ChannelID, message.ID, "◀️")
+		if err != nil {
+			logError("Failed to add reaction to activity list message! " + err.Error())
+			return
+		}
+		err = s.MessageReactionAdd(m.ChannelID, message.ID, "▶️")
+		if err != nil {
+			logError("Failed to add reaction to activity list message! " + err.Error())
+			return
+		}
+		logSuccess("Returned interactable activity list")
 	default:
-		// something about usage
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		if err != nil {
+			logError("Failed to send activity usage message! " + err.Error())
+			return
+		}
 		return
 	}
 }
@@ -567,14 +685,17 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 	var inactiveUsers []MemberActivity
 	// fetch all users in this guild, then filter to users who have been inactive more than <number> days
 	if len(command) != 3 {
-		s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return inactiveUsers
 	}
 
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", activityTable, m.GuildID)
 	results, err := connection_pool.Query(selectSQL)
 	if err != nil {
-		fmt.Println("Unable to read database for existing users in the guild! " + err.Error())
+		logError("Unable to read database for existing users in the guild! " + err.Error())
 		return inactiveUsers
 	}
 	defer results.Close()
@@ -586,12 +707,15 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		var memberActivity MemberActivity
 		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
 		if err != nil {
-			fmt.Println("Unable to parse database information! Aborting. " + err.Error())
+			logError("Unable to parse database information! Aborting. " + err.Error())
 			return inactiveUsers
 		}
 		daysInactive, err := strconv.Atoi(command[2])
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			_, msgErr := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			if msgErr != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
 			return inactiveUsers
 		}
 
@@ -601,7 +725,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			// calculate difference between time.Now() and the provided timestamp
 			lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
 			if err != nil {
-				fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+				logError("Unable to parse database timestamps! Aborting. " + err.Error())
 				return inactiveUsers
 			}
 			lastActive = lastActive.AddDate(0, 0, daysInactive)
@@ -610,5 +734,6 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			}
 		}
 	}
+	logSuccess("Searched for inactive users without any errors")
 	return inactiveUsers
 }

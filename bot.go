@@ -22,6 +22,7 @@ var globalImageSet []*ImageSet
 var globalInactiveSet []*InactiveSet
 var prefix string
 var commandList map[string]command
+var debug bool
 
 type handler func(*discordgo.Session, *discordgo.MessageCreate, []string)
 
@@ -98,6 +99,11 @@ func initCommandInfo() {
 }
 
 func runBot(token string) {
+	// FOR DEBUGGING!
+	debug = true
+
+	logInfo("Starting the application")
+
 	dbUsername = os.Getenv("DB_USERNAME")
 	dbPassword = os.Getenv("DB_PASSWORD")
 	db = os.Getenv("DB")
@@ -106,9 +112,9 @@ func runBot(token string) {
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 
 	// open connection to database
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
+	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(192.168.0.117:3306)/%s", dbUsername, dbPassword, db))
 	if err != nil {
-		fmt.Println("Unable to open DB connection! " + err.Error())
+		logError("Unable to open DB connection! " + err.Error())
 		return
 	}
 	defer db.Close()
@@ -124,6 +130,7 @@ func runBot(token string) {
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
+		logWarning("Production mode is active")
 		prodMode = true
 	}
 	start = time.Now()
@@ -131,7 +138,7 @@ func runBot(token string) {
 	// initialize bot
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		fmt.Println("Error creating discord session")
+		logError("Error creating discord session... " + err.Error())
 		return
 	}
 
@@ -148,7 +155,7 @@ func runBot(token string) {
 	// open connection to discord
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("Error opening connection,", err)
+		logError("Error opening connection! " + err.Error())
 		return
 	}
 
@@ -161,7 +168,7 @@ func runBot(token string) {
 	go runTwitterLoop(api, dg)
 
 	// Wait here until CTRL-C or other term signal is received.
-	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
+	logInfo("Bot is now running.  Press CTRL-C to exit.")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
@@ -176,7 +183,7 @@ Opens a stream looking for new tweets from @DeadbyBHVR, who posts the weekly
 shrine on Twitter.
 */
 func runTwitterLoop(api *anaconda.TwitterApi, dg *discordgo.Session) {
-	fmt.Println("Starting...")
+	logInfo("Listening to Twitter")
 	v := url.Values{}
 	v.Set("follow", "4850837842") // @DeadbyBHVR is 4850837842
 	v.Set("track", "shrine")
@@ -214,7 +221,10 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	embed.Footer = &footer
 
 	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Unable to send message! " + err.Error())
+	}
 
 }
 
@@ -223,6 +233,7 @@ Handler function when the discord session detects a message is created in
 a channel that the bot has access to.
 */
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+	logInfo("Message Create Event")
 	go checkForMessageLink(s, m)
 	go logActivity(m.GuildID, m.Author, time.Now().String(), "Wrote a message in <#"+m.ChannelID+">", false)
 	awardPoints(m.GuildID, m.Author, time.Now().String(), m.Content)
@@ -237,26 +248,25 @@ func messageReactionAdd(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 	go navigateImages(s, m)
 	user, err := s.User(m.UserID)
 	if err != nil {
-		fmt.Println("Error grabbing the user from m.UserID; " + err.Error())
+		logError("Could not get the user from the session state! " + err.Error())
 		return
 	}
 	go logActivity(m.GuildID, user, time.Now().String(), "Reacted with :"+m.Emoji.Name+": to a message in <#"+m.ChannelID+">", false)
 }
 
 func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
-	fmt.Println("User was added to guild")
 	go logActivity(m.GuildID, m.User, time.Now().String(), "Joined the server", true)
 	go joinLeaveMessage(s, m.GuildID, m.User, "join")
 }
 
 func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
-	fmt.Println("User was removed from guild")
+	logInfo("Guild Member Remove Event")
 	go removeUser(m.GuildID, m.User.ID)
 	go joinLeaveMessage(s, m.GuildID, m.User, "leave")
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
-	go logNewGuild(s, m.ID)
+	logNewGuild(s, m.ID)
 }
 
 func guildDelete(s *discordgo.Session, m *discordgo.GuildDelete) {
@@ -283,7 +293,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			linkedMessage, err := s.ChannelMessage(linkData[5], linkData[6])
 			if err != nil {
-				fmt.Println("ERROR linking message: " + err.Error())
+				logError("Unable to pull message from session: " + err.Error())
 				return
 			}
 
@@ -295,7 +305,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 				if err == nil {
 					nickname = member.Nick
 				} else {
-					fmt.Println(err)
+					logWarning("Unable to retrieve member's nickname. " + err.Error())
 				}
 				embedAuthor.Name = ""
 				if nickname != "" {
@@ -315,7 +325,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			linkedMessageChannel, err := s.Channel(linkData[5])
 			if err != nil {
-				fmt.Println("ERROR linking message: " + err.Error())
+				logError("Unable to pull channel from session: " + err.Error())
 				return
 			}
 
@@ -336,7 +346,12 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 			embed.Footer = &footer
 
 			// send response
-			s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+			if err != nil {
+				logError("Failed to send message link embed! " + err.Error())
+				return
+			}
+			logSuccess("Sent message link embed")
 		}
 	}
 }
@@ -381,12 +396,17 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 					3. Update the index in the set
 				*/
 				if m.Emoji.Name == "⏹️" {
-					// remove reactions and remove from list
+					logInfo("Removing listener for message ID " + m.MessageID)
 					tmpSet := globalImageSet[0]
 					globalImageSet[0] = globalImageSet[i]
 					globalImageSet[i] = tmpSet
 					globalImageSet = globalImageSet[1:]
-					s.MessageReactionsRemoveAll(m.ChannelID, m.MessageID)
+					err := s.MessageReactionsRemoveAll(m.ChannelID, m.MessageID)
+					if err != nil {
+						logError("Failed to remove all reactions from message! " + err.Error())
+						return
+					}
+					logSuccess("Removed from image sets and removed reactions on the message")
 				} else {
 					// craft response and send
 					var embed discordgo.MessageEmbed
@@ -396,10 +416,12 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 					fmt.Printf("Index before: %d\n", set.Index)
 					if m.Emoji.Name == "⬅️" {
 						if set.Index != 0 {
+							logInfo("Previous image for message ID " + m.MessageID)
 							set.Index--
 						}
 					} else if m.Emoji.Name == "➡️" {
 						if set.Index != len(set.Images)-1 {
+							logInfo("Next image for message ID " + m.MessageID)
 							set.Index++
 						}
 					}
@@ -412,8 +434,17 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 					footer.Text = fmt.Sprintf("Image %d of %d", set.Index+1, len(set.Images))
 					footer.IconURL = "https://cdn4.iconfinder.com/data/icons/new-google-logo-2015/400/new-google-favicon-512.png"
 					embed.Footer = &footer
-					s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
-					s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
+					_, err := s.ChannelMessageEditEmbed(m.ChannelID, m.MessageID, &embed)
+					if err != nil {
+						logError("Failed to send edit image embed! " + err.Error())
+						return
+					}
+					err = s.MessageReactionRemove(m.ChannelID, m.MessageID, m.Emoji.Name, m.UserID)
+					if err != nil {
+						logError("Failed to remove user's reaction! " + err.Error())
+						return
+					}
+					logSuccess("Updated image embed")
 				}
 			}
 		}
@@ -437,10 +468,12 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 
 				if m.Emoji.Name == "◀️" {
 					if set.Index != 0 {
+						logInfo("Previous page for message ID " + m.MessageID)
 						set.Index--
 					}
 				} else if m.Emoji.Name == "▶️" {
 					if set.Index != pageCount-1 {
+						logInfo("Next page for message ID " + m.MessageID)
 						set.Index++
 					}
 				}
@@ -452,7 +485,7 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 						dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 						lastActive, err := time.Parse(dateFormat, strings.Split(set.Inactives[i].LastActive, " m=")[0])
 						if err != nil {
-							fmt.Println("Unable to parse database timestamps! Aborting. " + err.Error())
+							logError("Unable to parse database timestamps! Aborting. " + err.Error())
 							return
 						}
 						contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
