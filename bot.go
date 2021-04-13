@@ -117,6 +117,7 @@ func runBot(token string) {
 	activityTable = os.Getenv("ACTIVITY_TABLE")
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
+	autokickTable = os.Getenv("AUTOKICK_TABLE")
 
 	// open connection to database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
@@ -131,9 +132,11 @@ func runBot(token string) {
 	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80), whitelist boolean);", activityTable)
 	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable)
 	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
+	createAutokickTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, days_until_kick int(11));", autokickTable)
 	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
 	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
 	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
+	queryWithoutResults(createAutokickTableSQL, "Unable to create autokick table!")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {

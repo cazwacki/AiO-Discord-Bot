@@ -21,6 +21,7 @@ var db string
 var activityTable string
 var leaderboardTable string
 var joinLeaveTable string
+var autokickTable string
 
 type MemberActivity struct {
 	ID          int    `json:"entry"`
@@ -602,7 +603,15 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 	case "list":
 		inactiveUsers := getInactiveUsers(s, m, command)
-		daysOfInactivity, _ := strconv.Atoi(command[2])
+		daysOfInactivity, err := strconv.Atoi(command[2])
+		if err != nil {
+			logError("Failed to convert string passed in to a number! " + err.Error())
+			_, err = s.ChannelMessageSend(m.ChannelID, "Please input a valid number.")
+			if err != nil {
+				logError("Failed to send 'invalid number' message! " + err.Error())
+			}
+			return
+		}
 
 		if len(inactiveUsers) == 0 {
 			_, err := s.ChannelMessageSend(m.ChannelID, "No user has been inactive for "+strconv.Itoa(daysOfInactivity)+"+ days.")
@@ -671,6 +680,48 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		logSuccess("Returned interactable activity list")
 	case "autokick":
 		// set autokick day check
+		if len(command) != 3 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity autokick <number>```")
+			if err != nil {
+				logError("Failed to send usage message! " + err.Error())
+			}
+			return
+		}
+
+		daysOfInactivity, err := strconv.Atoi(command[2])
+		if err != nil {
+			logError("Failed to convert string passed in to a number! " + err.Error())
+			_, err = s.ChannelMessageSend(m.ChannelID, "Please input a valid number.")
+			if err != nil {
+				logError("Failed to send 'invalid number' message! " + err.Error())
+			}
+			return
+		}
+
+		if daysOfInactivity < 1 {
+			// remove autokick time from table
+			deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
+			queryWithoutResults(deleteSQL, "Unable to delete autokick entry!")
+			_, err := s.ChannelMessageSend(m.ChannelID, "The server's auto-kick is now inactive.")
+			if err != nil {
+				logError("Failed to send autokick deactivation message! " + err.Error())
+				return
+			}
+			logSuccess("Removed server from autokick table and notified user")
+		} else {
+			// set autokick day count
+			deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
+			queryWithoutResults(deleteSQL, "Unable to delete old entry!")
+			insertSQL := fmt.Sprintf("INSERT INTO %s VALUES (guild_id, days_until_kick) VALUES (%s, %d);", autokickTable, m.GuildID, daysOfInactivity)
+			queryWithoutResults(insertSQL, "Unable to insert new entry!")
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
+			if err != nil {
+				logError("Failed to send autokick update message! " + err.Error())
+				return
+			}
+			logSuccess("Updated server in autokick table and notified user")
+		}
+
 	case "whitelist":
 		// ensure user is valid, then toggle that user in memberActivity
 	default:
