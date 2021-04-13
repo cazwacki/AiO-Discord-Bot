@@ -406,7 +406,10 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 				if len(sense.Labels) != 0 {
 					labels += "(" + strings.Join(sense.Labels, ", ") + ")"
 				}
-				descriptions += fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
+				newDescription := fmt.Sprintf("`%d. %s`\n %s\n\n", index+1, labels, sense.Definition)
+				if len(descriptions)+len(newDescription) <= 1024 {
+					descriptions += newDescription
+				}
 			}
 			fields = append(fields, createField(definition.PartOfSpeech, descriptions, false))
 		}
