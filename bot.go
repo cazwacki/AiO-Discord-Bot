@@ -32,8 +32,8 @@ type command struct {
 
 func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 	globalImageSet = append(globalImageSet, &newset)
-	fmt.Println("Global Image Set:")
-	fmt.Println(globalImageSet)
+	logInfo("Global Image Set:")
+	logInfo(fmt.Sprintf("%+v\n", globalImageSet))
 
 	time.Sleep(30 * time.Minute)
 
@@ -43,15 +43,18 @@ func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 			globalImageSet[0] = globalImageSet[i]
 			globalImageSet[i] = tmpSet
 			globalImageSet = globalImageSet[1:]
-			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			err := s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			if err != nil {
+				logError("Failed to remove reactions from the image embed! " + err.Error())
+			}
 		}
 	}
 }
 
 func appendToGlobalInactiveSet(s *discordgo.Session, newset InactiveSet) {
 	globalInactiveSet = append(globalInactiveSet, &newset)
-	fmt.Println("Global Inactive Set:")
-	fmt.Println(globalInactiveSet)
+	logInfo("Global Image Set:")
+	logInfo(fmt.Sprintf("%+v\n", globalInactiveSet))
 
 	time.Sleep(30 * time.Minute)
 
@@ -61,7 +64,10 @@ func appendToGlobalInactiveSet(s *discordgo.Session, newset InactiveSet) {
 			globalInactiveSet[0] = globalInactiveSet[i]
 			globalInactiveSet[i] = tmpSet
 			globalInactiveSet = globalInactiveSet[1:]
-			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			err := s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			if err != nil {
+				logError("Failed to remove reactions from the inactivity list! " + err.Error())
+			}
 		}
 	}
 }
@@ -161,6 +167,9 @@ func runBot(token string) {
 	}
 
 	initCommandInfo()
+
+	// start auto-kick listener
+	// go startAutoKicker()
 
 	/** Open Connection to Twitter **/
 	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
