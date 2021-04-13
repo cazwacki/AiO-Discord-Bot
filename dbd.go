@@ -178,16 +178,22 @@ Checks https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki for the most r
 post and outputs its information.
 **/
 func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
 	shrine := scrapeShrine()
-	fmt.Printf("%+v\n", shrine)
+	logInfo(fmt.Sprintf("%+v\n", shrine))
 
 	// create and send response
 	if len(shrine.Prices) == 0 {
-		s.ChannelMessageSend(m.ChannelID, "Sorry! I wasn't able to get the shrine :frowning:")
+		logWarning("Prices didn't correctly populate. Did the website design change?")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Sorry! I wasn't able to get the shrine :frowning:")
+		if err != nil {
+			logError("Failed to send 'failed to retrieve shrine' message! " + err.Error())
+			return
+		}
 		return
 	}
 
-	fmt.Println("Here's the shrine!")
+	logInfo("Retrieved the shrine")
 	// construct embed response
 	var embed discordgo.MessageEmbed
 	embed.URL = "https://deadbydaylight.gamepedia.com/Shrine_of_Secrets#Current_Shrine_of_Secrets"
@@ -204,8 +210,12 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Footer = &footer
 
 	// send response
-	s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send shrine embed! " + err.Error())
+		return
+	}
+	logSuccess("Sent shrine embed")
 }
 
 /**
@@ -231,12 +241,17 @@ func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
 		// attempt to read channel identity from file
 		buf, err := ioutil.ReadFile("./autoshrine_channel")
 		if err != nil {
+			logError("Unable to read file for autoshrine channel. " + err.Error())
 			handleTweet(s, v)
 			return
 		}
 
 		// send response
-		s.ChannelMessageSendEmbed(string(buf), &embed)
+		_, err = s.ChannelMessageSendEmbed(string(buf), &embed)
+		if err != nil {
+			logError("Failed to send tweet embed! " + err.Error())
+			return
+		}
 	}
 }
 
@@ -246,6 +261,7 @@ Helper function for Handle_autoshrine. Writes the new channel to file.
 func setNewChannel(channel string) bool {
 	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0644)
 	if err != nil {
+		logError("Failed to write new autoshrine! " + err.Error())
 		return false
 	}
 	return true
@@ -257,13 +273,22 @@ Switches the channel that the tweet monitoring system will output to.
 func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	// correct usage of autoshrine?
 	if len(command) != 2 {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+		logInfo("User passed in incorrect number of arguments")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
 		return
 	}
 
 	// is the second field a channel?
 	if !strings.HasPrefix(command[1], "<#") {
-		s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
+		logInfo("User passed in invalid channel")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Please pass in a valid channel.")
+		if err != nil {
+			logError("Failed to send invalid channel message! " + err.Error())
+			return
+		}
 		return
 	}
 
@@ -271,8 +296,17 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 	channel := strings.ReplaceAll(command[1], "<#", "")
 	channel = strings.ReplaceAll(channel, ">", "")
 	if setNewChannel(channel) {
-		s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
+		if err != nil {
+			logError("Failed to send successful update message! " + err.Error())
+			return
+		}
 	} else {
-		s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
+		_, err := s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
+		if err != nil {
+			logError("Failed to send failed update message! " + err.Error())
+			return
+		}
 	}
+	logSuccess("Updated autoshrine")
 }
