@@ -29,6 +29,7 @@ type MemberActivity struct {
 	MemberName  string `json:"member_name"`
 	LastActive  string `json:"last_active"`
 	Description string `json:"description"`
+	Whitelisted int    `json:"whitelist"`
 }
 
 type LeaderboardEntry struct {
@@ -173,7 +174,7 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 	var memberActivities []MemberActivity
 	for results.Next() {
 		var memberActivity MemberActivity
-		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
+		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 		if err != nil {
 			logError("Unable to parse database information! Aborting. " + err.Error())
 			return 0
@@ -560,7 +561,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			} else {
 				for query.Next() {
 					var memberActivity MemberActivity
-					err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
+					err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 					if err != nil {
 						logError("Unable to parse database information! Aborting. " + err.Error())
 						return
@@ -668,13 +669,15 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			return
 		}
 		logSuccess("Returned interactable activity list")
+	case "autokick":
+		// set autokick day check
+	case "whitelist":
+		// ensure user is valid, then toggle that user in memberActivity
 	default:
 		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
 		if err != nil {
 			logError("Failed to send activity usage message! " + err.Error())
-			return
 		}
-		return
 	}
 }
 
@@ -705,7 +708,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 
 	for results.Next() {
 		var memberActivity MemberActivity
-		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description)
+		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 		if err != nil {
 			logError("Unable to parse database information! Aborting. " + err.Error())
 			return inactiveUsers
