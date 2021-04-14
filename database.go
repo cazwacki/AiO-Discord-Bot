@@ -23,6 +23,11 @@ var leaderboardTable string
 var joinLeaveTable string
 var autokickTable string
 
+type AutoKickData struct {
+	GuildID       string `json:"guild_id"`
+	DaysUntilKick int    `json:"days_until_kick"`
+}
+
 type MemberActivity struct {
 	ID          int    `json:"entry"`
 	GuildID     string `json:"guild_id"`
@@ -703,11 +708,48 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		logSuccess("Returned interactable activity list")
 	case "autokick":
 		// set autokick day check
-		if len(command) != 3 {
+		if len(command) != 3 && len(command) != 2 {
 			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity autokick <number>```")
 			if err != nil {
 				logError("Failed to send usage message! " + err.Error())
 			}
+			return
+		}
+
+		if len(command) == 2 {
+			selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
+			results, err := connection_pool.Query(selectSQL)
+			if err != nil {
+				logError("Unable to read database for existing users in the guild! " + err.Error())
+				return
+			}
+			defer results.Close()
+
+			autokickEnabled := false
+			for results.Next() {
+				autokickEnabled = true
+				// send message
+				var autokickData AutoKickData
+				err := results.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
+				if err != nil {
+					logError("Unable to parse database information! Aborting. " + err.Error())
+					return
+				}
+				_, err = s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Current set to autokick users after %d days of inactivity.", autokickData.DaysUntilKick))
+				if err != nil {
+					logError("Failed to send 'invalid number' message! " + err.Error())
+					return
+				}
+			}
+
+			if !autokickEnabled {
+				_, err = s.ChannelMessageSend(m.ChannelID, "Autokick is currently disabled for the server.")
+				if err != nil {
+					logError("Failed to send 'autokick disabled' message! " + err.Error())
+					return
+				}
+			}
+			logSuccess("Returned autokick info")
 			return
 		}
 
@@ -748,7 +790,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 	case "whitelist":
 		// ensure user is valid, then toggle that user in memberActivity
 		if len(command) != 4 {
-			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity whitelist <@user> (optional: true/false)```")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity whitelist <@user> <true/false>```")
 			if err != nil {
 				logError("Failed to send usage message! " + err.Error())
 			}
@@ -793,7 +835,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 		logSuccess("Set user's whitelist state")
 	default:
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>\n~activity autokick <number of days of inactivity>\n~activity whitelist <@user> true/false```")
 		if err != nil {
 			logError("Failed to send activity usage message! " + err.Error())
 		}
