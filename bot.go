@@ -32,8 +32,8 @@ type command struct {
 
 func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 	globalImageSet = append(globalImageSet, &newset)
-	fmt.Println("Global Image Set:")
-	fmt.Println(globalImageSet)
+	logInfo("Global Image Set:")
+	logInfo(fmt.Sprintf("%+v\n", globalImageSet))
 
 	time.Sleep(30 * time.Minute)
 
@@ -43,15 +43,18 @@ func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
 			globalImageSet[0] = globalImageSet[i]
 			globalImageSet[i] = tmpSet
 			globalImageSet = globalImageSet[1:]
-			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			err := s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			if err != nil {
+				logError("Failed to remove reactions from the image embed! " + err.Error())
+			}
 		}
 	}
 }
 
 func appendToGlobalInactiveSet(s *discordgo.Session, newset InactiveSet) {
 	globalInactiveSet = append(globalInactiveSet, &newset)
-	fmt.Println("Global Inactive Set:")
-	fmt.Println(globalInactiveSet)
+	logInfo("Global Image Set:")
+	logInfo(fmt.Sprintf("%+v\n", globalInactiveSet))
 
 	time.Sleep(30 * time.Minute)
 
@@ -61,7 +64,10 @@ func appendToGlobalInactiveSet(s *discordgo.Session, newset InactiveSet) {
 			globalInactiveSet[0] = globalInactiveSet[i]
 			globalInactiveSet[i] = tmpSet
 			globalInactiveSet = globalInactiveSet[1:]
-			s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			err := s.MessageReactionsRemoveAll(newset.Message.ChannelID, newset.Message.ID)
+			if err != nil {
+				logError("Failed to remove reactions from the inactivity list! " + err.Error())
+			}
 		}
 	}
 }
@@ -111,6 +117,7 @@ func runBot(token string) {
 	activityTable = os.Getenv("ACTIVITY_TABLE")
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
+	autokickTable = os.Getenv("AUTOKICK_TABLE")
 
 	// open connection to database
 	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
@@ -122,12 +129,14 @@ func runBot(token string) {
 	connection_pool = db
 
 	// create tables if they don't exist
-	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80));", activityTable)
+	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80), whitelist boolean);", activityTable)
 	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable)
 	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
+	createAutokickTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, days_until_kick int(11));", autokickTable)
 	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
 	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
 	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
+	queryWithoutResults(createAutokickTableSQL, "Unable to create autokick table!")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
@@ -162,6 +171,9 @@ func runBot(token string) {
 
 	initCommandInfo()
 
+	// start auto-kick listener
+	go runAutoKicker(dg)
+
 	/** Open Connection to Twitter **/
 	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
 	anaconda.SetConsumerSecret(os.Getenv("TWITTER_API_SECRET"))
@@ -177,6 +189,61 @@ func runBot(token string) {
 	// Cleanly close down the Discord session and Twitter connection.
 	dg.Close()
 	api.Close()
+}
+
+func runAutoKicker(dg *discordgo.Session) {
+	for {
+		logWarning("Performing auto-kick")
+		// 1. get days_until_kick for each guild
+		selectSQL := fmt.Sprintf("SELECT * FROM %s;", autokickTable)
+		query, err := connection_pool.Query(selectSQL)
+		if err != nil {
+			logError("SELECT query error: " + err.Error())
+		} else {
+			for query.Next() {
+				var autokickData AutoKickData
+				err = query.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
+				if err != nil {
+					logError("Unable to parse database information! Aborting. " + err.Error())
+					return
+				} else {
+					// 2. get all users from member activity table that are not whitelisted and are in the given guild
+					selectSQL = fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND whitelist = false);", activityTable, autokickData.GuildID)
+					memberQuery, err := connection_pool.Query(selectSQL)
+					if err != nil {
+						logError("SELECT query error: " + err.Error())
+					} else {
+						for memberQuery.Next() {
+							var memberActivity MemberActivity
+							err = memberQuery.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
+							if err != nil {
+								logError("Unable to parse database information! Aborting. " + err.Error())
+							} else {
+								dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+								// calculate difference between time.Now() and the provided timestamp
+								lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
+								if err != nil {
+									logError("Unable to parse database timestamps! Aborting. " + err.Error())
+								} else {
+									lastActive = lastActive.AddDate(0, 0, autokickData.DaysUntilKick)
+									if lastActive.Before(time.Now()) {
+										// kick user
+										err = dg.GuildMemberDeleteWithReason(autokickData.GuildID, memberActivity.MemberID, fmt.Sprintf("Bot detected %d or more days of inactivity.", autokickData.DaysUntilKick))
+										if err != nil {
+											logError("Unable to kick user! " + err.Error())
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			query.Close()
+		}
+
+		time.Sleep(6 * time.Hour)
+	}
 }
 
 /**
@@ -489,7 +556,13 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 							logError("Unable to parse database timestamps! Aborting. " + err.Error())
 							return
 						}
-						contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
+						fieldValue := "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + set.Inactives[i].Description
+						// add whitelist state
+						if set.Inactives[i].Whitelisted == 1 {
+							fieldValue += "\n- Protected from auto-kick"
+						}
+
+						contents = append(contents, createField(set.Inactives[i].MemberName, fieldValue, false))
 					}
 					embed.Fields = contents
 
