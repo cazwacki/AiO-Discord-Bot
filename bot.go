@@ -107,7 +107,7 @@ func initCommandInfo() {
 
 func runBot(token string) {
 	// FOR DEBUGGING!
-	debug = false
+	debug = true
 
 	logInfo("Starting the application")
 
@@ -172,7 +172,7 @@ func runBot(token string) {
 	initCommandInfo()
 
 	// start auto-kick listener
-	// go startAutoKicker()
+	go runAutoKicker(dg)
 
 	/** Open Connection to Twitter **/
 	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
@@ -189,6 +189,60 @@ func runBot(token string) {
 	// Cleanly close down the Discord session and Twitter connection.
 	dg.Close()
 	api.Close()
+}
+
+func runAutoKicker(dg *discordgo.Session) {
+	for {
+		// 1. get days_until_kick for each guild
+		selectSQL := fmt.Sprintf("SELECT * FROM %s;", autokickTable)
+		query, err := connection_pool.Query(selectSQL)
+		if err != nil {
+			logError("SELECT query error: " + err.Error())
+		} else {
+			for query.Next() {
+				var autokickData AutoKickData
+				err = query.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
+				if err != nil {
+					logError("Unable to parse database information! Aborting. " + err.Error())
+					return
+				} else {
+					// 2. get all users from member activity table that are not whitelisted and are in the given guild
+					selectSQL = fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND whitelist = false);", activityTable, autokickData.GuildID)
+					memberQuery, err := connection_pool.Query(selectSQL)
+					if err != nil {
+						logError("SELECT query error: " + err.Error())
+					} else {
+						for memberQuery.Next() {
+							var memberActivity MemberActivity
+							err = memberQuery.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
+							if err != nil {
+								logError("Unable to parse database information! Aborting. " + err.Error())
+							} else {
+								dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+								// calculate difference between time.Now() and the provided timestamp
+								lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
+								if err != nil {
+									logError("Unable to parse database timestamps! Aborting. " + err.Error())
+								} else {
+									lastActive = lastActive.AddDate(0, 0, autokickData.DaysUntilKick)
+									if lastActive.Before(time.Now()) {
+										// kick user
+										err = dg.GuildMemberDeleteWithReason(autokickData.GuildID, memberActivity.MemberID, fmt.Sprintf("Bot detected %d or more days of inactivity.", autokickData.DaysUntilKick))
+										if err != nil {
+											logError("Unable to kick user! " + err.Error())
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			query.Close()
+		}
+
+		time.Sleep(6 * time.Hour)
+	}
 }
 
 /**
@@ -501,7 +555,13 @@ func navigateImages(s *discordgo.Session, m *discordgo.MessageReactionAdd) {
 							logError("Unable to parse database timestamps! Aborting. " + err.Error())
 							return
 						}
-						contents = append(contents, createField(set.Inactives[i].MemberName, "- "+lastActive.Format("01/02/2006 15:04:05")+"\n- "+set.Inactives[i].Description, false))
+						fieldValue := "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + set.Inactives[i].Description
+						// add whitelist state
+						if set.Inactives[i].Whitelisted == 1 {
+							fieldValue += "\n- Protected from auto-kick"
+						}
+
+						contents = append(contents, createField(set.Inactives[i].MemberName, fieldValue, false))
 					}
 					embed.Fields = contents
 
