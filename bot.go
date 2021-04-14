@@ -193,6 +193,7 @@ func runBot(token string) {
 
 func runAutoKicker(dg *discordgo.Session) {
 	for {
+		logWarning("Performing auto-kick")
 		// 1. get days_until_kick for each guild
 		selectSQL := fmt.Sprintf("SELECT * FROM %s;", autokickTable)
 		query, err := connection_pool.Query(selectSQL)
