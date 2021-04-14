@@ -107,7 +107,7 @@ func initCommandInfo() {
 
 func runBot(token string) {
 	// FOR DEBUGGING!
-	debug = true
+	debug = false
 
 	logInfo("Starting the application")
 
