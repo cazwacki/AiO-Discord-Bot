@@ -267,12 +267,14 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 }
 
 // helper function for queries we don't need the results for.
-func queryWithoutResults(sql string, errMessage string) {
+func queryWithoutResults(sql string, errMessage string) bool {
 	query, err := connection_pool.Query(sql)
 	if err != nil {
 		logError(errMessage + " " + err.Error())
+		return false
 	}
 	defer query.Close()
+	return true
 }
 
 /****
@@ -523,14 +525,6 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
-	// if len(command) < 2 || len(command) > 3 {
-	// 	_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
-	// 	if err != nil {
-	// 		logError("Failed to send usage message! " + err.Error())
-	// 	}
-	// 	return
-	// }
-
 	switch command[1] {
 	case "rescan":
 		if len(command) != 2 {
@@ -707,6 +701,14 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 		logSuccess("Returned interactable activity list")
 	case "autokick":
+		if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
+			logWarning("User without appropriate permissions tried to mess with autokick")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you don't have the `Manage Server` permission.")
+			if err != nil {
+				logError("Failed to send permissions message! " + err.Error())
+			}
+			return
+		}
 		// set autokick day check
 		if len(command) != 3 && len(command) != 2 {
 			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity autokick <number>```")
@@ -788,6 +790,14 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			logSuccess("Updated server in autokick table and notified user")
 		}
 	case "whitelist":
+		if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
+			logWarning("User attempted to use whitelist without proper permissions")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you don't have the `Kick Members` permission.")
+			if err != nil {
+				logError("Failed to send permissions message! " + err.Error())
+			}
+			return
+		}
 		// ensure user is valid, then toggle that user in memberActivity
 		if len(command) != 4 {
 			_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity whitelist <@user> <true/false>```")
