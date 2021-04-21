@@ -15,7 +15,7 @@ import (
 Used to validate a user's permissions before moving forward with a command. Prevents command abuse.
 If the user has administrator permissions, just automatically allow them to perform any bot command.
 **/
-func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int) bool {
+func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int64) bool {
 	perms, err := s.UserChannelPermissions(m.Author.ID, m.ChannelID)
 	if err != nil {
 		logError("Failed to acquire user permissions! " + err.Error())
@@ -35,14 +35,10 @@ func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, p
 Given a userID, generates a DM if one does not already exist with the user and sends the specified
 message to them.
 **/
-func dmUser(s *discordgo.Session, m *discordgo.MessageCreate, userID string, message string) {
+func dmUser(s *discordgo.Session, userID string, message string) {
 	channel, err := s.UserChannelCreate(userID)
 	if err != nil {
 		logError("Failed to create DM with user. " + err.Error())
-		_, err = s.ChannelMessageSend(m.ChannelID, err.Error())
-		if err != nil {
-			logError("Failed to send error message! " + err.Error())
-		}
 		return
 	}
 	_, err = s.ChannelMessageSend(channel.ID, message)
@@ -98,7 +94,7 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			if len(command) > 2 {
 				// dm user why they were kicked
 				reason := strings.Join(command[2:], " ")
-				dmUser(s, m, userID, "You have been kicked by "+m.Author.Username+" for the following reason: '"+reason+"'.")
+				dmUser(s, userID, "You have been kicked by "+m.Author.Username+" for the following reason: '"+reason+"'.")
 				// kick with reason
 				err := s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
 				if err != nil {
@@ -127,7 +123,7 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					}
 					return
 				}
-				dmUser(s, m, userID, "You have been kicked by "+m.Author.Username+".")
+				dmUser(s, userID, "You have been kicked by "+m.Author.Username+".")
 				_, err = s.ChannelMessageSend(m.ChannelID, ":wave: Kicked "+command[1]+".")
 				if err != nil {
 					logWarning("Failed to send success message! " + err.Error())
@@ -167,7 +163,7 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 					}
 					return
 				}
-				dmUser(s, m, userID, "You have been banned by "+m.Author.Username+" because: '"+reason+"'.")
+				dmUser(s, userID, "You have been banned by "+m.Author.Username+" because: '"+reason+"'.")
 				_, err = s.ChannelMessageSend(m.ChannelID, ":hammer: Banned "+command[1]+" for the following reason: '"+reason+"'.")
 				if err != nil {
 					logWarning("Failed to send failure message! " + err.Error())
@@ -185,7 +181,7 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 					}
 					return
 				}
-				dmUser(s, m, userID, "You have been banned by "+m.Author.Username+".")
+				dmUser(s, userID, "You have been banned by "+m.Author.Username+".")
 				_, err = s.ChannelMessageSend(m.ChannelID, ":hammer: Banned "+command[1]+".")
 				if err != nil {
 					logWarning("Failed to send failure message! " + err.Error())
