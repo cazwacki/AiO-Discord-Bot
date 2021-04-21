@@ -49,7 +49,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~activity user @user: Returns the user's last sign of activity.
 - [x] ~activity rescan: (Should be useless most of the time) Checks for any users in a server that are not in the database, and adds them to it.
 - [x] ~activity whitelist @user (true / false): Adds or removes a user from the auto-kick whitelist. They will have a mark that they are protected in activity list and user.
-- [x] ~activity autokick (number of days of inactivity): Sets the server's auto-kick to occur when non-whitelisted users have been inactive for the specified number of days. If set to < 1, then the autokick is deactivated.
+- [x] ~activity autokick (number of days of inactivity: optional): Sets the server's auto-kick to occur when non-whitelisted users have been inactive for the specified number of days. If set to < 1, then the autokick is deactivated. If you do not include a number, it tells you the current state of auto-kick.
 - [x] ~about @user: Get user details related to the Guild the message was called in. 
 - [x] ~leaderboard: Get top 10 (or top x where x is the number of people who have sent a message) users with the highest chat scores. 
 - [x] ~greeter help: Provides information on how to set messages to be sent on members entering / exiting a server. 
