@@ -292,7 +292,7 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	embed.Thumbnail = &thumbnail
 
 	// add all commands to the embed as a set of fields that are not inline
-	embed.Description = "[Command List](https://cazwacki.github.io/bot-commands.html)"
+	embed.Description = "The [Command List](https://cazwacki.github.io/bot-commands.html) is now hosted on Github.IO"
 
 	// self-credit + github profile picture
 	var footer discordgo.MessageEmbedFooter
