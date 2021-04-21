@@ -109,6 +109,8 @@ func runBot(token string) {
 	// FOR DEBUGGING!
 	debug = false
 
+	fmt.Println(discordgo.VERSION)
+
 	logInfo("Starting the application")
 
 	dbUsername = os.Getenv("DB_USERNAME")
@@ -159,8 +161,9 @@ func runBot(token string) {
 	dg.AddHandler(guildMemberRemove)
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(guildDelete)
+	dg.AddHandler(voiceStateUpdate)
 
-	*dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers | discordgo.IntentsGuilds
+	dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers | discordgo.IntentsGuilds
 
 	// open connection to discord
 	err = dg.Open()
@@ -232,6 +235,15 @@ func runAutoKicker(dg *discordgo.Session) {
 										if err != nil {
 											logError("Unable to kick user! " + err.Error())
 										}
+										guild, err := dg.Guild(autokickData.GuildID)
+										if err != nil {
+											logError("Unable to load guild! " + err.Error())
+										}
+										guildName := "error: could not retrieve"
+										if guild != nil {
+											guildName = guild.Name
+										}
+										dmUser(dg, memberActivity.MemberID, fmt.Sprintf("You have been automatically kicked from **%s** due to %d or more days of inactivity.", guildName, autokickData.DaysUntilKick))
 									}
 								}
 							}
@@ -293,7 +305,6 @@ func handleHelp(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	if err != nil {
 		logError("Unable to send message! " + err.Error())
 	}
-
 }
 
 /**
@@ -339,6 +350,23 @@ func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
 
 func guildDelete(s *discordgo.Session, m *discordgo.GuildDelete) {
 	removeGuild(m.ID)
+}
+
+func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
+	user, err := s.User(v.UserID)
+	if err != nil {
+		logError("Could not get the user from the session state! " + err.Error())
+		return
+	}
+	if v.ChannelID == "" {
+		if v.BeforeUpdate != nil {
+			logActivity(v.GuildID, user, time.Now().String(), "Left <#"+v.BeforeUpdate.ChannelID+">", false)
+		} else {
+			logActivity(v.GuildID, user, time.Now().String(), "Left a voice channel", false)
+		}
+	} else {
+		logActivity(v.GuildID, user, time.Now().String(), "Joined <#"+v.ChannelID+">", false)
+	}
 }
 
 func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
