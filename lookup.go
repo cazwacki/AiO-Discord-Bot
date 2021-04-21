@@ -396,7 +396,10 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		currentEntry := terms.UrbanEntries[i]
 		cleanedDefinition := strings.ReplaceAll(currentEntry.Definition, "[", "")
 		cleanedDefinition = strings.ReplaceAll(cleanedDefinition, "]", "")
-		descriptions += fmt.Sprintf("**[%d. :thumbsup:+%d, :thumbsdown:-%d](%s)**\n%s\n\n", (i + 1), currentEntry.ThumbsUp, currentEntry.ThumbsDown, currentEntry.Permalink, cleanedDefinition)
+		newDescription := fmt.Sprintf("**[%d. :thumbsup:+%d, :thumbsdown:-%d](%s)**\n%s\n\n", (i + 1), currentEntry.ThumbsUp, currentEntry.ThumbsDown, currentEntry.Permalink, cleanedDefinition)
+		if len(descriptions)+len(newDescription) <= 2048 {
+			descriptions += newDescription
+		}
 	}
 	embed.Description = descriptions
 	var footer discordgo.MessageEmbedFooter
