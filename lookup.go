@@ -341,7 +341,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 	embed.Title = "Time Conversion"
-	embed.Description = cmdTime + " " + cmdTimezone + " today would be..."
+	embed.Description = fmt.Sprintf("%s %s %d/%d/%d would be...", cmdTime, cmdTimezone, today.Month(), today.Day(), today.Year())
 	embed.Timestamp = adjustedTime.Format(discordTimestamp)
 
 	var footer discordgo.MessageEmbedFooter
