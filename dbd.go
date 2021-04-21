@@ -40,9 +40,13 @@ func formatPerk(command []string) string {
 		if strings.Contains(specialWords, command[i]) {
 			command[i] = strings.ToLower(command[i])
 		} else {
-			tmp := []rune(command[i])
-			tmp[0] = unicode.ToUpper(tmp[0])
-			command[i] = string(tmp)
+			words := strings.Split(command[i], "-")
+			for j := 1; j < len(words); j++ {
+				tmp := []rune(words[j])
+				tmp[0] = unicode.ToUpper(tmp[0])
+				words[j] = string(tmp)
+			}
+			command[i] = strings.Join(words, "-")
 		}
 	}
 	perk := strings.Join(command[1:], "_")
@@ -151,7 +155,7 @@ func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	}
 	requestedPerkString := formatPerk(command)
 	perk := scrapePerk(requestedPerkString)
-	fmt.Printf("%+v\n", perk)
+	logInfo(fmt.Sprintf("%+v\n", perk))
 
 	// create and send response
 	if perk.Name == "" {

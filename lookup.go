@@ -341,7 +341,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	var embed discordgo.MessageEmbed
 	embed.Type = "rich"
 	embed.Title = "Time Conversion"
-	embed.Description = cmdTime + " " + cmdTimezone + " today would be..."
+	embed.Description = fmt.Sprintf("%s %s %d/%d/%d would be...", cmdTime, cmdTimezone, today.Month(), today.Day(), today.Year())
 	embed.Timestamp = adjustedTime.Format(discordTimestamp)
 
 	var footer discordgo.MessageEmbedFooter
@@ -396,7 +396,10 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		currentEntry := terms.UrbanEntries[i]
 		cleanedDefinition := strings.ReplaceAll(currentEntry.Definition, "[", "")
 		cleanedDefinition = strings.ReplaceAll(cleanedDefinition, "]", "")
-		descriptions += fmt.Sprintf("**[%d. :thumbsup:+%d, :thumbsdown:-%d](%s)**\n%s\n\n", (i + 1), currentEntry.ThumbsUp, currentEntry.ThumbsDown, currentEntry.Permalink, cleanedDefinition)
+		newDescription := fmt.Sprintf("**[%d. :thumbsup:+%d, :thumbsdown:-%d](%s)**\n%s\n\n", (i + 1), currentEntry.ThumbsUp, currentEntry.ThumbsDown, currentEntry.Permalink, cleanedDefinition)
+		if len(descriptions)+len(newDescription) <= 2048 {
+			descriptions += newDescription
+		}
 	}
 	embed.Description = descriptions
 	var footer discordgo.MessageEmbedFooter
