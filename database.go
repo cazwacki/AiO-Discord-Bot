@@ -83,12 +83,20 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 		// INSERT INTO table (guild_id, member_id, last_active, description) VALUES (guildID, userID, time, description)
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, last_active, description) VALUES ('%s', '%s', '%s', '%s', '%s');",
 			activityTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, time, description)
-		queryWithoutResults(insertSQL, "Unable to insert new user!")
+		if queryWithoutResults(insertSQL, "Unable to insert new user!") {
+			logSuccess("User added to activity log")
+		} else {
+			logWarning("Couldn't add new user to activity log! Is the connection still available?")
+		}
 	} else {
 		// UPDATE table SET (last_active = time, description = description) WHERE (guild_id = guildID AND member_id = userID)
 		updateSQL := fmt.Sprintf("UPDATE %s SET last_active = '%s', description = '%s', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
 			activityTable, time, description, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, guildID, user.ID)
-		queryWithoutResults(updateSQL, "Unable to update user's activity!")
+		if queryWithoutResults(updateSQL, "Unable to update user's activity!") {
+			logSuccess("User's activity updated")
+		} else {
+			logWarning("Couldn't update user activity! Is the connection still available?")
+		}
 	}
 
 }
@@ -96,7 +104,11 @@ func logActivity(guildID string, user *discordgo.User, time string, description 
 // removes the user's row when they leave the server.
 func removeUser(guildID string, userID string) {
 	deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND member_id = '%s');", activityTable, guildID, userID)
-	queryWithoutResults(deleteSQL, "Unable to delete user's activity!")
+	if queryWithoutResults(deleteSQL, "Unable to delete user's activity!") {
+		logSuccess("User removed from activity log")
+	} else {
+		logWarning("Couldn't remove user from activity log! Is the connection still available?")
+	}
 }
 
 // sends the guild's join/leave message when a user enters/leaves the server.
@@ -211,7 +223,11 @@ func logNewGuild(s *discordgo.Session, guildID string) int {
 // removes the provided guild's members from the database.
 func removeGuild(guildID string) {
 	deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", activityTable, guildID)
-	queryWithoutResults(deleteSQL, "Unable to delete guild from database!")
+	if queryWithoutResults(deleteSQL, "Unable to delete guild from database!") {
+		logSuccess("Guild removed from activity log")
+	} else {
+		logWarning("Couldn't remove guild from activity log! Is the connection still available?")
+	}
 }
 
 // awards a user points for the guild's leaderboard based on the word count formula.
@@ -253,7 +269,11 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 				newScore := pointsToAward + leaderboardEntry.Points
 				updateSQL := fmt.Sprintf("UPDATE %s SET last_awarded = '%s', points = '%d', member_name = '%s' WHERE (guild_id = '%s' AND member_id = '%s');",
 					leaderboardTable, currentTime, newScore, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, guildID, user.ID)
-				queryWithoutResults(updateSQL, "Unable to update member's points in database!")
+				if queryWithoutResults(updateSQL, "Unable to update member's points in database!") {
+					logSuccess("User points updated")
+				} else {
+					logWarning("Couldn't update user's points! Is the connection still available?")
+				}
 			}
 		}
 	}
@@ -261,7 +281,11 @@ func awardPoints(guildID string, user *discordgo.User, currentTime string, messa
 	if !foundUser {
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, member_id, member_name, points, last_awarded) VALUES ('%s', '%s', '%s', '%d', '%s');",
 			leaderboardTable, guildID, user.ID, strings.ReplaceAll(user.Username, "'", "\\'")+"#"+user.Discriminator, pointsToAward, currentTime)
-		queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!")
+		if queryWithoutResults(insertSQL, "awardPoints(): Unable to insert new user!") {
+			logSuccess("Added new user to leaderboard")
+		} else {
+			logWarning("Couldn't add new user to leaderboard! Is the connection still available?")
+		}
 		return
 	}
 }
@@ -406,12 +430,20 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 
 		// remove old message if it exists
 		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, m.GuildID, command[2])
-		queryWithoutResults(deleteSQL, fmt.Sprintf("Unable to delete old %s message!", command[2]))
+		if queryWithoutResults(deleteSQL, fmt.Sprintf("Unable to delete old %s message!", command[2])) {
+			logSuccess("Removed old greeter message")
+		} else {
+			logWarning("Couldn't remove old greeter message! Is the connection still available?")
+		}
 
 		// add new message
 		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, channel_id, message_type, image_link, message) VALUES ('%s', '%s', '%s', '%s', '%s');",
 			joinLeaveTable, m.GuildID, channel, command[2], imageURL, message)
-		queryWithoutResults(insertSQL, fmt.Sprintf("Unable to set new %s message!", command[2]))
+		if queryWithoutResults(insertSQL, fmt.Sprintf("Unable to set new %s message!", command[2])) {
+			logSuccess("Added new greeter message")
+		} else {
+			logWarning("Couldn't add new greeter message! Is the connection still available?")
+		}
 
 		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
 		if err != nil {
@@ -437,12 +469,19 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			return
 		}
 		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s' AND message_type = '%s');", joinLeaveTable, m.GuildID, command[2])
-		queryWithoutResults(deleteSQL, "Unable to delete the message!")
-		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed message when user %ss, if there was an existing message.", command[2]))
-		if err != nil {
-			logError("Failed to send greeter reset success message! " + err.Error())
+		if queryWithoutResults(deleteSQL, "Unable to delete the message!") {
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Removed message when user %ss, if there was an existing message.", command[2]))
+			if err != nil {
+				logError("Failed to send greeter reset success message! " + err.Error())
+			}
+			logSuccess("Notified user that greeter message is removed")
+		} else {
+			_, err := s.ChannelMessageSend(m.ChannelID, "An error occurred. Please try again in a moment.")
+			if err != nil {
+				logError("Failed to send greeter reset success message! " + err.Error())
+			}
+			logWarning("Couldn't add new user to activity log! Is the connection still available?")
 		}
-		logSuccess("Notified user that greeter message is removed")
 	default:
 		_, err := s.ChannelMessageSend(m.ChannelID, "Use ~greeter help to learn more about this command.")
 		if err != nil {
@@ -769,25 +808,49 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		if daysOfInactivity < 1 {
 			// remove autokick time from table
 			deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
-			queryWithoutResults(deleteSQL, "Unable to delete autokick entry!")
-			_, err := s.ChannelMessageSend(m.ChannelID, "The server's auto-kick is now inactive.")
-			if err != nil {
-				logError("Failed to send autokick deactivation message! " + err.Error())
-				return
+			if queryWithoutResults(deleteSQL, "Unable to delete autokick entry!") {
+				_, err := s.ChannelMessageSend(m.ChannelID, "The server's auto-kick is now inactive.")
+				if err != nil {
+					logError("Failed to send autokick deactivation message! " + err.Error())
+					return
+				}
+				logSuccess("Removed server from autokick table and notified user")
+			} else {
+				_, err := s.ChannelMessageSend(m.ChannelID, "An error occurred. Please try again in a moment.")
+				if err != nil {
+					logError("Failed to send autokick error message! " + err.Error())
+					return
+				}
+				logWarning("Failed to deleted autokick entry! Is the connection still available?")
 			}
-			logSuccess("Removed server from autokick table and notified user")
 		} else {
 			// set autokick day count
 			deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autokickTable, m.GuildID)
-			queryWithoutResults(deleteSQL, "Unable to delete old entry!")
-			insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, days_until_kick) VALUES ('%s', %d);", autokickTable, m.GuildID, daysOfInactivity)
-			queryWithoutResults(insertSQL, "Unable to insert new entry!")
-			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
-			if err != nil {
-				logError("Failed to send autokick update message! " + err.Error())
-				return
+			if queryWithoutResults(deleteSQL, "Unable to delete old entry!") {
+				insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, days_until_kick) VALUES ('%s', %d);", autokickTable, m.GuildID, daysOfInactivity)
+				if queryWithoutResults(insertSQL, "Unable to insert new entry!") {
+					_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
+					if err != nil {
+						logError("Failed to send autokick update message! " + err.Error())
+						return
+					}
+					logSuccess("Updated server in autokick table and notified user")
+				} else {
+					_, err := s.ChannelMessageSend(m.ChannelID, "An error occurred. Please try again in a moment.")
+					if err != nil {
+						logError("Failed to send autokick error message! " + err.Error())
+						return
+					}
+					logWarning("Failed to insert new autokick entry! Is the connection still available?")
+				}
+			} else {
+				_, err := s.ChannelMessageSend(m.ChannelID, "An error occurred. Please try again in a moment.")
+				if err != nil {
+					logError("Failed to send autokick error message! " + err.Error())
+					return
+				}
+				logWarning("Failed to delete old autokick entry! Is the connection still available?")
 			}
-			logSuccess("Updated server in autokick table and notified user")
 		}
 	case "whitelist":
 		if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
@@ -829,21 +892,29 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 		updateSQL := fmt.Sprintf("UPDATE %s SET whitelist = %s WHERE (guild_id = '%s' AND member_id = '%s');",
 			activityTable, command[3], m.GuildID, userID)
-		queryWithoutResults(updateSQL, "Unable to update user's whitelist state!")
-		if command[3] == "true" {
-			_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now a member of the autokick whitelist.")
-			if err != nil {
-				logError("Failed to send result message! " + err.Error())
-				return
+		if queryWithoutResults(updateSQL, "Unable to update user's whitelist state!") {
+			if command[3] == "true" {
+				_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now a member of the autokick whitelist.")
+				if err != nil {
+					logError("Failed to send result message! " + err.Error())
+					return
+				}
+			} else {
+				_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now not a member of the autokick whitelist.")
+				if err != nil {
+					logError("Failed to send result message! " + err.Error())
+					return
+				}
 			}
+			logSuccess("Set user's whitelist state")
 		} else {
-			_, err := s.ChannelMessageSend(m.ChannelID, "Tagged user is now not a member of the autokick whitelist.")
+			logWarning("Query failed, but continuing to run")
+			_, err := s.ChannelMessageSend(m.ChannelID, "An error occurred. Please try again in a moment.")
 			if err != nil {
-				logError("Failed to send result message! " + err.Error())
+				logError("Failed to send error message! " + err.Error())
 				return
 			}
 		}
-		logSuccess("Set user's whitelist state")
 	default:
 		_, err := s.ChannelMessageSend(m.ChannelID, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>\n~activity autokick <number of days of inactivity>\n~activity whitelist <@user> true/false```")
 		if err != nil {
