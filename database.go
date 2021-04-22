@@ -563,6 +563,13 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 }
 
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) == 1 {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: ```~activity rescan/user/whitelist/autokick/list```")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
+		return
+	}
 	logInfo(strings.Join(command, " "))
 	switch command[1] {
 	case "rescan":
