@@ -106,8 +106,8 @@ func initCommandInfo() {
 }
 
 func runBot(token string) {
-	// FOR DEBUGGING!
-	debug = false
+	// FOR DEBUG INFO!
+	debug = true
 
 	fmt.Println(discordgo.VERSION)
 
@@ -115,17 +115,32 @@ func runBot(token string) {
 
 	dbUsername = os.Getenv("DB_USERNAME")
 	dbPassword = os.Getenv("DB_PASSWORD")
-	db = os.Getenv("DB")
+	dbName = os.Getenv("DB")
 	activityTable = os.Getenv("ACTIVITY_TABLE")
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 	autokickTable = os.Getenv("AUTOKICK_TABLE")
 
 	// open connection to database
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(localhost:3306)/%s", dbUsername, dbPassword, db))
-	if err != nil {
-		logError("Unable to open DB connection! " + err.Error())
+	retry := 90
+	var db *sql.DB
+	var err error
+	dbConnectStr := fmt.Sprintf("%s:%s@tcp(%s:3306)/%s", dbUsername, dbPassword, dbHost, dbName)
+	logInfo(dbConnectStr)
+	for db == nil && retry > 0 {
+		logInfo("Calling sql.open")
+		db, err = sql.Open("mysql", dbConnectStr)
+		if err != nil {
+			logWarning("Unable to open DB connection! " + err.Error())
+		}
+		time.Sleep(1 * time.Second)
+		retry--
+	}
+	if db == nil {
+		logError("Could not open DB connection after many retries. Shutting down.")
 		return
+	} else {
+		logInfo("Connected to database.")
 	}
 	defer db.Close()
 	connection_pool = db

@@ -17,7 +17,7 @@ import (
 var connection_pool *sql.DB
 var dbUsername string
 var dbPassword string
-var db string
+var dbName string
 var activityTable string
 var leaderboardTable string
 var joinLeaveTable string
