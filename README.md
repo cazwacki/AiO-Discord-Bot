@@ -15,7 +15,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 7. (~urban functionality) [Get an unofficial Urban Dictionary API Key.](https://rapidapi.com/community/api/urban-dictionary)
 8. Put the keys, tokens, and secrets you have acquired into api-keys.env.
 9. Configure your MariaDB volume location in docker-compose.yml.
-10. `cd` into the project and call `docker build -t aio-bot:1.0 -f Dockerfile . && docker-compose up -d` (-d is optional; it makes the containers run in the background). The bot should start running after a couple minutes the first time; afterwards, it should only be a few seconds each time the bot is started.
+10. `cd` into the project and call `docker-compose up -d` (-d is optional; it makes the containers run in the background). The bot should start running after a couple minutes the first time; afterwards, it should only be a few seconds each time the bot is started.
 
 ## Commands
 
