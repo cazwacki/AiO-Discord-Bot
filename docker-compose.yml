@@ -1,0 +1,33 @@
+version: '3'
+services:
+  mariadb:
+    container_name: mariadb
+    image: mariadb:10.6.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 89kjeisfhjioljl839wlc
+      MYSQL_DATABASE: aio-bot-db
+      MYSQL_USER: aio-bot
+      MYSQL_PASSWORD: aio-bot-passwd-182982174
+    volumes:
+    - /your/path/here:/var/lib/mysql
+    ports:
+    - 3306:3306
+
+  aio-bot:
+    container_name: aio-bot
+    image: aio-bot:1.0
+    restart: always
+    depends_on:
+    - mariadb
+    env_file:
+    - api-keys.env
+    environment:
+      DB_HOST: mariadb
+      DB: aio-bot-db
+      DB_USERNAME: aio-bot
+      DB_PASSWORD: aio-bot-passwd-182982174
+      ACTIVITY_TABLE: activity
+      LEADERBOARD_TABLE: leaderboard
+      JOIN_LEAVE_TABLE: join_leave_messages
+      AUTOKICK_TABLE: autokick

@@ -6,31 +6,16 @@ Bot for my Discord server hooked up to a CI/CD system and developed in Go. It ut
 UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay $70/mo. for a pet project.
 
 ## Setup
-1. If your environment does not have Go, [install it from here.](https://golang.org/dl/)
+1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) if you don't have them.
 2. Clone/download this code.
 3. [Create a bot on the Discord Developer Portal](https://discord.com/developers) and save its token.
 4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
 5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
 6. (~define functionality) [Get a Lingua API Key.](https://www.linguarobot.io/) The first 2500 requests a day are free.
 7. (~urban functionality) [Get an unofficial Urban Dictionary API Key.](https://rapidapi.com/community/api/urban-dictionary)
-8. Create a local MySQL or MariaDB database and create a username, password, and database so the bot can access it.
-9. Set the following information as environment variables on the system you are deploying the bot:
-   - BOT_TOKEN
-   - TWITTER_API_KEY
-   - TWITTER_API_SECRET
-   - TWITTER_TOKEN
-   - TWITTER_TOKEN_SECRET
-   - GOOGLE_API_KEY
-   - LINGUA_API_KEY
-   - URBAN_DICTIONARY_API_KEY
-   - DB_USERNAME
-   - DB_PASSWORD
-   - DB
-   - ACTIVITY_TABLE (can be any name)
-   - LEADERBOARD_TABLE (can be any name)
-   - JOIN_LEAVE_TABLE (can be any name)
-   - AUTOKICK_TABLE (can be any name)
-10. Call `go run .` to invoke the bot.
+8. Put the keys, tokens, and secrets you have acquired into api-keys.env.
+9. Configure your MariaDB volume location in docker-compose.yml.
+10. `cd` into the project and call `docker build -t aio-bot:1.0 -f Dockerfile . && docker-compose up -d` (-d is optional; it makes the containers run in the background). The bot should start running after a couple minutes the first time; afterwards, it should only be a few seconds each time the bot is started.
 
 ## Commands
 
