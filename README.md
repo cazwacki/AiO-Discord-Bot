@@ -7,7 +7,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 
 ## Setup
 1. Install [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) if you don't have them.
-2. Clone/download this code.
+2. Run `docker pull czawacki/aio-bot` to download the build.
 3. [Create a bot on the Discord Developer Portal](https://discord.com/developers) and save its token.
 4. (~autoshrine functionality) [Get Twitter API access.](https://developer.twitter.com/en/apply-for-access) You need an API Key, Secret, Twitter Token, and Twitter Token Secret.
 5. (~image functionality) [Get Google CustomSearch API Access.](https://developers.google.com/custom-search/v1/overview) You need a Google API Key. (Only the first 100 requests each day are free, so I would only use this bot on a server with a few people.)
