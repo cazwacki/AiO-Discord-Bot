@@ -116,6 +116,7 @@ func runBot(token string) {
 	dbUsername = os.Getenv("DB_USERNAME")
 	dbPassword = os.Getenv("DB_PASSWORD")
 	dbName = os.Getenv("DB")
+	dbHost = os.Getenv("DB_HOST")
 	activityTable = os.Getenv("ACTIVITY_TABLE")
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
