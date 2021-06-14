@@ -93,17 +93,6 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			userID := stripUserID(command[1])
 			if len(command) > 2 {
 				reason := strings.Join(command[2:], " ")
-				// kick with reason
-				err := s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
-				if err != nil {
-					logError("Failed to kick user! " + err.Error())
-					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to kick the user.")
-					if err != nil {
-						logWarning("Failed to send failure message! " + err.Error())
-					}
-					return
-				}
-
 				// dm user why they were kicked
 				guild, err := s.Guild(m.GuildID)
 				if err != nil {
@@ -114,16 +103,8 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					guildName = guild.Name
 				}
 				dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
-
-				_, err = s.ChannelMessageSend(m.ChannelID, ":wave: Kicked "+command[1]+" for the following reason: '"+reason+"'.")
-				if err != nil {
-					logWarning("Failed to send success message! " + err.Error())
-					return
-				}
-				logSuccess("Kicked user with reason")
-			} else {
-				// kick without reason
-				err := s.GuildMemberDelete(m.GuildID, userID)
+				// kick with reason
+				err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
 				if err != nil {
 					logError("Failed to kick user! " + err.Error())
 					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to kick the user.")
@@ -132,6 +113,13 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					}
 					return
 				}
+				_, err = s.ChannelMessageSend(m.ChannelID, ":wave: Kicked "+command[1]+" for the following reason: '"+reason+"'.")
+				if err != nil {
+					logWarning("Failed to send success message! " + err.Error())
+					return
+				}
+				logSuccess("Kicked user with reason")
+			} else {
 				// dm user they were kicked
 				guild, err := s.Guild(m.GuildID)
 				if err != nil {
@@ -142,6 +130,16 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					guildName = guild.Name
 				}
 				dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
+				// kick without reason
+				err = s.GuildMemberDelete(m.GuildID, userID)
+				if err != nil {
+					logError("Failed to kick user! " + err.Error())
+					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to kick the user.")
+					if err != nil {
+						logWarning("Failed to send failure message! " + err.Error())
+					}
+					return
+				}
 				_, err = s.ChannelMessageSend(m.ChannelID, ":wave: Kicked "+command[1]+".")
 				if err != nil {
 					logWarning("Failed to send success message! " + err.Error())
