@@ -47,6 +47,7 @@ func formatPerk(command []string) string {
 				words[j] = string(tmp)
 			}
 			command[i] = strings.Join(words, "-")
+			command[i] = strings.Title(command[i])
 		}
 	}
 	perk := strings.Join(command[1:], "_")
@@ -73,7 +74,7 @@ func scrapePerk(perk string) Perk {
 	}
 
 	/** Get Perk Name **/
-	docName := doc.Find(".firstHeading").First()
+	docName := doc.Find("#firstHeading").First()
 	resultingPerk.Name = docName.Text()
 
 	/** Get Description **/
