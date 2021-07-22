@@ -607,6 +607,21 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	query := strings.Join(command[1:], "_")
 	page := fetchArticle(query)
 
+	// if there is no article, try again with smart capitalization
+	if page.URLs == nil {
+		specialWords := " in the of for from "
+		for i := 1; i < len(command); i++ {
+			if strings.Contains(specialWords, command[i]) {
+				command[i] = strings.ToLower(command[i])
+			} else {
+				command[i] = strings.Title(command[i])
+			}
+		}
+		query = strings.Join(command[1:], "_")
+	}
+
+	page = fetchArticle(query)
+
 	if page.URLs == nil {
 		_, err := s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
 		if err != nil {
