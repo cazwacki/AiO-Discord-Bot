@@ -73,7 +73,7 @@ func scrapePerk(perk string) Perk {
 	}
 
 	/** Get Perk Name **/
-	docName := doc.Find(".firstHeading").First()
+	docName := doc.Find("#firstHeading").First()
 	resultingPerk.Name = docName.Text()
 
 	/** Get Description **/
