@@ -41,13 +41,12 @@ func formatPerk(command []string) string {
 			command[i] = strings.ToLower(command[i])
 		} else {
 			words := strings.Split(command[i], "-")
-			for j := 1; j < len(words); j++ {
+			for j := 0; j < len(words); j++ {
 				tmp := []rune(words[j])
 				tmp[0] = unicode.ToUpper(tmp[0])
 				words[j] = string(tmp)
 			}
 			command[i] = strings.Join(words, "-")
-			command[i] = strings.Title(command[i])
 		}
 	}
 	perk := strings.Join(command[1:], "_")

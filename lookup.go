@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
@@ -614,7 +615,9 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 			if strings.Contains(specialWords, command[i]) {
 				command[i] = strings.ToLower(command[i])
 			} else {
-				command[i] = strings.Title(command[i])
+				tmp := []rune(command[i])
+				tmp[0] = unicode.ToUpper(tmp[0])
+				command[i] = string(tmp)
 			}
 		}
 		query = strings.Join(command[1:], "_")
