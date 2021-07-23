@@ -128,12 +128,6 @@ func logModActivity(s *discordgo.Session, guildID string, entry *discordgo.Audit
 			var thumbnail discordgo.MessageEmbedThumbnail
 			thumbnail.URL = user.AvatarURL("512")
 			embed.Thumbnail = &thumbnail
-		case discordgo.AuditLogActionChannelCreate, discordgo.AuditLogActionChannelUpdate, discordgo.AuditLogActionChannelDelete:
-			actor, err := s.GuildMember(guildID, entry.UserID)
-			if err != nil {
-				logError("Unable to get actor from session state!")
-				return
-			}
 		}
 
 		_, err := s.ChannelMessageSendEmbed(modLogData.ChannelID, &embed)
