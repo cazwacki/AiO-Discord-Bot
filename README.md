@@ -30,6 +30,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
    - LEADERBOARD_TABLE (can be any name)
    - JOIN_LEAVE_TABLE (can be any name)
    - AUTOKICK_TABLE (can be any name)
+   - MODLOG_TABLE (can be any name)
 10. Call `go run .` to invoke the bot.
 
 ## Commands
@@ -53,6 +54,8 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 - [x] ~about @user: Get user details related to the Guild the message was called in. 
 - [x] ~leaderboard: Get top 10 (or top x where x is the number of people who have sent a message) users with the highest chat scores. 
 - [x] ~greeter help: Provides information on how to set messages to be sent on members entering / exiting a server. 
+- [x] ~modlog set (#channel): Provides kick, ban, and unban logs for tracking purposes.
+- [x] ~modlog reset: Stops the bot from posting kick, ban, and unban logs until a new channel is provided.
   
 ### Dead By Daylight Commands
 - [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
