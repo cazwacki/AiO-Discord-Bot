@@ -109,22 +109,31 @@ func logModActivity(s *discordgo.Session, guildID string, entry *discordgo.Audit
 			action := ""
 			switch *entry.ActionType {
 			case discordgo.AuditLogActionMemberKick:
-				action = "👢KICKED"
+				action = "👢Kicked"
 			case discordgo.AuditLogActionMemberBanAdd:
-				action = "🚫BANNED"
+				action = "🚫Banned"
 			case discordgo.AuditLogActionMemberBanRemove:
-				action = "🤝BAN REVOKED"
+				action = "🤝Ban Revoked for"
 			}
 			embed.Title = fmt.Sprintf("%s %s#%s", action, user.Username, user.Discriminator)
 			actorString := fmt.Sprintf("%s#%s", actor.User.Username, actor.User.Discriminator)
 			if actor.Nick != "" {
 				actorString = fmt.Sprintf("%s (%s)", actor.Nick, actorString)
 			}
-			embed.Description = fmt.Sprintf("**Actor**: %s\n**Reason**: '%s'", actorString, entry.Reason)
+			embed.Description = fmt.Sprintf("**Actor**: %s\n", actorString)
+			if *entry.ActionType != discordgo.AuditLogActionMemberBanRemove {
+				fmt.Sprintf("**Reason**: '%s'", entry.Reason)
+			}
 
 			var thumbnail discordgo.MessageEmbedThumbnail
 			thumbnail.URL = user.AvatarURL("512")
 			embed.Thumbnail = &thumbnail
+		case discordgo.AuditLogActionChannelCreate, discordgo.AuditLogActionChannelUpdate, discordgo.AuditLogActionChannelDelete:
+			actor, err := s.GuildMember(guildID, entry.UserID)
+			if err != nil {
+				logError("Unable to get actor from session state!")
+				return
+			}
 		}
 
 		_, err := s.ChannelMessageSendEmbed(modLogData.ChannelID, &embed)
