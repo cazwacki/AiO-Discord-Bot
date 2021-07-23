@@ -102,6 +102,7 @@ func initCommandInfo() {
 		"activity":    {activity},
 		"leaderboard": {leaderboard},
 		"greeter":     {greeter},
+		"modlog":      {setModLogChannel},
 	}
 }
 
@@ -121,6 +122,7 @@ func runBot(token string) {
 	leaderboardTable = os.Getenv("LEADERBOARD_TABLE")
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 	autokickTable = os.Getenv("AUTOKICK_TABLE")
+	modLogTable = os.Getenv("MODLOG_TABLE")
 
 	// open connection to database
 	retry := 90
@@ -151,10 +153,12 @@ func runBot(token string) {
 	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable)
 	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
 	createAutokickTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, days_until_kick int(11));", autokickTable)
+	createModLogTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, channel_id char(20));", modLogTable)
 	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
 	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
 	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
 	queryWithoutResults(createAutokickTableSQL, "Unable to create autokick table!")
+	queryWithoutResults(createModLogTableSQL, "Unable to create mod log table!")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
@@ -177,6 +181,9 @@ func runBot(token string) {
 	dg.AddHandler(guildMemberRemove)
 	dg.AddHandler(guildCreate)
 	dg.AddHandler(guildDelete)
+	dg.AddHandler(guildBanAdd)
+	dg.AddHandler(guildBanRemove)
+	dg.AddHandler(guildEmojisUpdate)
 	dg.AddHandler(voiceStateUpdate)
 
 	dg.Identify.Intents = discordgo.IntentsAllWithoutPrivileged | discordgo.IntentsGuildMembers | discordgo.IntentsGuilds
@@ -357,7 +364,17 @@ func guildMemberAdd(s *discordgo.Session, m *discordgo.GuildMemberAdd) {
 func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 	logInfo("Guild Member Remove Event")
 	go removeUser(m.GuildID, m.User.ID)
-	go joinLeaveMessage(s, m.GuildID, m.User, "leave")
+	latestLog, err := s.GuildAuditLog(m.GuildID, "", "", -1, 1)
+	if err != nil {
+		logError("Could not get the guild audit log from the session state! " + err.Error())
+		return
+	}
+	// log mod activity if applicable, otherwise send the leave message
+	if latestLog.AuditLogEntries[0].TargetID == m.User.ID {
+		go logModActivity(s, m.GuildID, latestLog.AuditLogEntries[0])
+	} else {
+		go joinLeaveMessage(s, m.GuildID, m.User, "leave")
+	}
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
@@ -366,6 +383,42 @@ func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
 
 func guildDelete(s *discordgo.Session, m *discordgo.GuildDelete) {
 	removeGuild(m.ID)
+}
+
+func guildEmojisUpdate(s *discordgo.Session, m *discordgo.GuildEmojisUpdate) {
+	// check audit log for who did it
+	latestLog, err := s.GuildAuditLog(m.GuildID, "", "", -1, 1)
+	if err != nil {
+		logError("Could not get the guild audit log from the session state! " + err.Error())
+		return
+	}
+	fmt.Printf("%+v\n", latestLog)
+	fmt.Printf("%+v\n", latestLog.AuditLogEntries[0])
+	fmt.Printf("%+v\n", latestLog.AuditLogEntries[0].Changes[0])
+}
+
+func guildBanAdd(s *discordgo.Session, m *discordgo.GuildBanAdd) {
+	logInfo("Guild Ban Added")
+	latestLog, err := s.GuildAuditLog(m.GuildID, "", "", (int)(discordgo.AuditLogActionMemberBanAdd), 1)
+	if err != nil {
+		logError("Could not get the guild audit log from the session state! " + err.Error())
+		return
+	}
+	if latestLog.AuditLogEntries[0].TargetID == m.User.ID {
+		go logModActivity(s, m.GuildID, latestLog.AuditLogEntries[0])
+	}
+}
+
+func guildBanRemove(s *discordgo.Session, m *discordgo.GuildBanRemove) {
+	logInfo("Guild Ban Removed")
+	latestLog, err := s.GuildAuditLog(m.GuildID, "", "", (int)(discordgo.AuditLogActionMemberBanRemove), 1)
+	if err != nil {
+		logError("Could not get the guild audit log from the session state! " + err.Error())
+		return
+	}
+	if latestLog.AuditLogEntries[0].TargetID == m.User.ID {
+		go logModActivity(s, m.GuildID, latestLog.AuditLogEntries[0])
+	}
 }
 
 func voiceStateUpdate(s *discordgo.Session, v *discordgo.VoiceStateUpdate) {
