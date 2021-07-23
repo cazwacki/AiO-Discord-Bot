@@ -23,10 +23,16 @@ var activityTable string
 var leaderboardTable string
 var joinLeaveTable string
 var autokickTable string
+var modLogTable string
 
 type AutoKickData struct {
 	GuildID       string `json:"guild_id"`
 	DaysUntilKick int    `json:"days_until_kick"`
+}
+
+type ModLogData struct {
+	GuildID   string `json:"guild_id"`
+	ChannelID string `json:"channel_id"`
 }
 
 type MemberActivity struct {
@@ -67,6 +73,66 @@ type InactiveSet struct {
 /****
 EVENT HANDLERS
 ****/
+// logs on - updating the server (like icon, name) - create / update / delete a channel - kick member - ban / unban member - emoji create / update / delete
+func logModActivity(s *discordgo.Session, guildID string, entry *discordgo.AuditLogEntry) {
+	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", modLogTable, guildID)
+	query, err := connection_pool.Query(selectSQL)
+	if err != nil {
+		logError("SELECT query error, but not stopping execution: " + err.Error())
+	}
+	defer query.Close()
+
+	for query.Next() {
+		// write and send embed
+		var modLogData ModLogData
+		err = query.Scan(&modLogData.GuildID, &modLogData.ChannelID)
+		if err != nil {
+			logError("Unable to parse database information! Aborting. " + err.Error())
+			return
+		}
+
+		var embed discordgo.MessageEmbed
+		embed.Type = "rich"
+
+		switch *entry.ActionType {
+		case discordgo.AuditLogActionMemberKick, discordgo.AuditLogActionMemberBanAdd, discordgo.AuditLogActionMemberBanRemove:
+			user, err := s.User(entry.TargetID)
+			if err != nil {
+				logError("Unable to get user from session state!")
+				return
+			}
+			actor, err := s.GuildMember(guildID, entry.UserID)
+			if err != nil {
+				logError("Unable to get actor from session state!")
+				return
+			}
+			action := ""
+			switch *entry.ActionType {
+			case discordgo.AuditLogActionMemberKick:
+				action = "👢KICKED"
+			case discordgo.AuditLogActionMemberBanAdd:
+				action = "🚫BANNED"
+			case discordgo.AuditLogActionMemberBanRemove:
+				action = "🤝BAN REVOKED"
+			}
+			embed.Title = fmt.Sprintf("%s %s#%s", action, user.Username, user.Discriminator)
+			actorString := fmt.Sprintf("%s#%s", actor.User.Username, actor.User.Discriminator)
+			if actor.Nick != "" {
+				actorString = fmt.Sprintf("%s (%s)", actor.Nick, actorString)
+			}
+			embed.Description = fmt.Sprintf("**Actor**: %s\n**Reason**: '%s'", actorString, entry.Reason)
+
+			var thumbnail discordgo.MessageEmbedThumbnail
+			thumbnail.URL = user.AvatarURL("512")
+			embed.Thumbnail = &thumbnail
+		}
+
+		_, err := s.ChannelMessageSendEmbed(modLogData.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send message embed. " + err.Error())
+		}
+	}
+}
 
 // logs when a user sends a message, reacts to a message, or joins the server.
 func logActivity(guildID string, user *discordgo.User, time string, description string, newUser bool) {
@@ -305,6 +371,77 @@ func queryWithoutResults(sql string, errMessage string) bool {
 /****
 COMMANDS
 ****/
+func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage this.")
+		if err != nil {
+			logError("Failed to send permissions message! " + err.Error())
+		}
+		return
+	}
+	if len(command) != 3 && len(command) != 2 {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~modlog set #channel / ~modlog reset`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
+		return
+	}
+	switch command[1] {
+	case "set":
+		// create or update entry in database
+		channel := strings.ReplaceAll(command[2], "<#", "")
+		channel = strings.ReplaceAll(channel, ">", "")
+		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
+		if !matched {
+			logInfo("User did not specify channel correctly")
+			_, err := s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+			if err != nil {
+				logError("Failed to send modlog channel error message! " + err.Error())
+			}
+			return
+		}
+
+		// remove old channel if it exists
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", modLogTable, m.GuildID)
+		if queryWithoutResults(deleteSQL, "Unable to delete old modlog channel!") {
+			logSuccess("Removed old modlog channel")
+		} else {
+			logWarning("Couldn't remove old modlog channel! Is the connection still available?")
+		}
+
+		// add new channel
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, channel_id) VALUES ('%s', '%s');",
+			modLogTable, m.GuildID, channel)
+		if queryWithoutResults(insertSQL, "Unable to set new modlog channel!") {
+			logSuccess("Added new modlog channel")
+		} else {
+			logWarning("Couldn't add new modlog channel! Is the connection still available?")
+		}
+
+		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the moderation log channel to <#%s>!", channel))
+		if err != nil {
+			logError("Failed to send modlog channel success message! " + err.Error())
+			return
+		}
+		logSuccess("Set new modlog channel")
+	case "reset":
+		// remove old channel if it exists
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", modLogTable, m.GuildID)
+		if queryWithoutResults(deleteSQL, "Unable to delete old modlog channel!") {
+			logSuccess("Removed old modlog channel")
+		} else {
+			logWarning("Couldn't remove old modlog channel! Is the connection still available?")
+		}
+
+		_, err := s.ChannelMessageSend(m.ChannelID, "I'll stop posting mod logs until you set a new channel. :slight_smile:")
+		if err != nil {
+			logError("Failed to send modlog channel success message! " + err.Error())
+			return
+		}
+		logSuccess("Reset modlog channel")
+	}
+}
+
 func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
