@@ -78,7 +78,8 @@ func logModActivity(s *discordgo.Session, guildID string, entry *discordgo.Audit
 	selectSQL := fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s');", modLogTable, guildID)
 	query, err := connection_pool.Query(selectSQL)
 	if err != nil {
-		logError("SELECT query error, but not stopping execution: " + err.Error())
+		logError("SELECT query error, so stopping execution: " + err.Error())
+		return
 	}
 	defer query.Close()
 
@@ -122,7 +123,7 @@ func logModActivity(s *discordgo.Session, guildID string, entry *discordgo.Audit
 			}
 			embed.Description = fmt.Sprintf("**Actor**: %s\n", actorString)
 			if *entry.ActionType != discordgo.AuditLogActionMemberBanRemove {
-				fmt.Sprintf("**Reason**: '%s'", entry.Reason)
+				embed.Description += fmt.Sprintf("**Reason**: '%s'", entry.Reason)
 			}
 
 			var thumbnail discordgo.MessageEmbedThumbnail
