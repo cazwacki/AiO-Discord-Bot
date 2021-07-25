@@ -369,12 +369,11 @@ func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 		logError("Could not get the guild audit log from the session state! " + err.Error())
 		return
 	}
-	// log mod activity if applicable, otherwise send the leave message
+	// log mod activity if applicable
 	if latestLog.AuditLogEntries[0].TargetID == m.User.ID {
 		go logModActivity(s, m.GuildID, latestLog.AuditLogEntries[0])
-	} else {
-		go joinLeaveMessage(s, m.GuildID, m.User, "leave")
 	}
+	joinLeaveMessage(s, m.GuildID, m.User, "leave")
 }
 
 func guildCreate(s *discordgo.Session, m *discordgo.GuildCreate) {
