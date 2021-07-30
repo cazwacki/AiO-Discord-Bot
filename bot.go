@@ -370,7 +370,7 @@ func guildMemberRemove(s *discordgo.Session, m *discordgo.GuildMemberRemove) {
 		return
 	}
 	// log mod activity if applicable
-	if latestLog.AuditLogEntries[0].TargetID == m.User.ID {
+	if latestLog.AuditLogEntries[0].TargetID == m.User.ID && *latestLog.AuditLogEntries[0].ActionType == discordgo.AuditLogActionMemberKick {
 		go logModActivity(s, m.GuildID, latestLog.AuditLogEntries[0])
 	}
 	joinLeaveMessage(s, m.GuildID, m.User, "leave")
@@ -398,6 +398,7 @@ func guildEmojisUpdate(s *discordgo.Session, m *discordgo.GuildEmojisUpdate) {
 
 func guildBanAdd(s *discordgo.Session, m *discordgo.GuildBanAdd) {
 	logInfo("Guild Ban Added")
+	time.Sleep(time.Millisecond * 200)
 	latestLog, err := s.GuildAuditLog(m.GuildID, "", "", (int)(discordgo.AuditLogActionMemberBanAdd), 1)
 	if err != nil {
 		logError("Could not get the guild audit log from the session state! " + err.Error())

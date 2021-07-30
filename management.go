@@ -103,6 +103,7 @@ func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 					guildName = guild.Name
 				}
 				dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+
 				// kick with reason
 				err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
 				if err != nil {
@@ -168,16 +169,7 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 			userID := stripUserID(command[1])
 			if len(command) > 2 {
 				reason := strings.Join(command[2:], " ")
-				// ban with reason
-				err := s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
-				if err != nil {
-					logError("Failed to ban user! " + err.Error())
-					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to ban the user.")
-					if err != nil {
-						logWarning("Failed to send failure message! " + err.Error())
-					}
-					return
-				}
+
 				// dm user why they were banned
 				guild, err := s.Guild(m.GuildID)
 				if err != nil {
@@ -188,6 +180,17 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 					guildName = guild.Name
 				}
 				dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+
+				// ban with reason
+				err := s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
+				if err != nil {
+					logError("Failed to ban user! " + err.Error())
+					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to ban the user.")
+					if err != nil {
+						logWarning("Failed to send failure message! " + err.Error())
+					}
+					return
+				}
 
 				_, err = s.ChannelMessageSend(m.ChannelID, ":hammer: Banned "+command[1]+" for the following reason: '"+reason+"'.")
 				if err != nil {
