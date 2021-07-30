@@ -182,7 +182,7 @@ func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 				dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
 
 				// ban with reason
-				err := s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
+				err = s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
 				if err != nil {
 					logError("Failed to ban user! " + err.Error())
 					_, err = s.ChannelMessageSend(m.ChannelID, "Failed to ban the user.")
