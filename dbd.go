@@ -256,7 +256,7 @@ When a new shrine tweet is received, construct a message and post it to the desi
 autoshrine channel.
 */
 func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
-	if strings.HasPrefix(v.Text, "This week's shrine is:") && v.User.Id == 4850837842 {
+	if strings.HasPrefix(v.Text, "This week's shrine is") && v.User.Id == 4850837842 {
 		// construct embed response
 		var embed discordgo.MessageEmbed
 		splitText := strings.Split(strings.ReplaceAll(v.FullText, "&amp;", "&"), " ")
