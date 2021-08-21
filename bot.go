@@ -103,6 +103,9 @@ func initCommandInfo() {
 		"leaderboard": {leaderboard},
 		"greeter":     {greeter},
 		"modlog":      {setModLogChannel},
+		"addon":       {handleAddon},
+		"killer":      {handleKiller},
+		"survivor":    {handleSurvivor},
 	}
 }
 
