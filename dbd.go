@@ -59,6 +59,30 @@ type Shrine struct {
 }
 
 /**
+Helper function for handle_addon and should be used before scrape_addon
+to ensure the string is appropriately formatted such that it can be used
+as the end of the URL query to https://deadbydaylight.gamepedia.com/.
+*/
+func formatAddon(command []string) string {
+	specialWords := " of on up brand outs "
+	for i := 1; i < len(command); i++ {
+		words := strings.Split(command[i], "-")
+		for j := 0; j < len(words); j++ {
+			if !strings.Contains(specialWords, words[j]) {
+				tmp := []rune(words[j])
+				tmp[0] = unicode.ToUpper(tmp[0])
+				words[j] = string(tmp)
+			}
+		}
+		command[i] = strings.Join(words, "-")
+	}
+	addon := strings.Join(command[1:], "_")
+	addon = strings.Replace(addon, "_And", "_&", 1)
+	addon = url.QueryEscape(addon)
+	return addon
+}
+
+/**
 Helper function for Handle_perk and should be used before scrape_perk.
 Formats the perk provided in the command such that it can be used as
 the end of the URL query to https://deadbydaylight.gamepedia.com/.
@@ -85,7 +109,50 @@ func formatPerk(command []string) string {
 }
 
 /**
-Helper function for Handle_perk. Scrapes HTML from the respective
+Helper function for handle_addon. Scrapes HTML from the respective
+page on https://deadbydaylight.gamepedia.com/ and returns the
+desired information in the Addon struct created above.
+*/
+func scrapeAddon(addon string) Addon {
+	var resultingAddon Addon
+
+	resultingAddon.PageURL = "https://deadbydaylight.gamepedia.com/" + addon
+
+	// Request the HTML page.
+	doc := loadPage(resultingAddon.PageURL)
+
+	if doc == nil {
+		return resultingAddon
+	}
+
+	// get name
+	docName := doc.Find("#firstHeading").First()
+	resultingAddon.Name = docName.Text()
+
+	docData := doc.Find(".wikitable").First().Find("tr").Last()
+
+	// get icon URL
+	currentSrc := docData.Find("img").First().AttrOr("src", "nil")
+	if strings.Contains(currentSrc, ".png") {
+		resultingAddon.IconURL = currentSrc
+	}
+
+	// get description
+	docDescription := docData.Find("td").First().Text()
+
+	// remove impurities
+	docDescription = strings.ReplaceAll(docDescription, " .", ".")
+	docDescription = strings.ReplaceAll(docDescription, "  ", " ")
+	docDescription = strings.ReplaceAll(docDescription, " %", "%")
+	docDescription = strings.ReplaceAll(docDescription, "\n", "\n\n")
+
+	resultingAddon.Description = docDescription
+
+	return resultingAddon
+}
+
+/**
+Helper function for handle_perk. Scrapes HTML from the respective
 page on https://deadbydaylight.gamepedia.com/ and returns the
 desired information in the Perk struct created above.
 */
@@ -171,6 +238,39 @@ func scrapeShrine() Shrine {
 	resultingShrine.TimeUntilReset = "Shrine " + docShrine.Find("th").Last().Text()
 
 	return resultingShrine
+}
+
+/**
+Fetches addon information from https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki
+and displays the png icon as well as the add-on's function.
+**/
+func handleAddon(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) < 2 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~addon <addon name>`")
+		return
+	}
+	requestedAddonString := formatAddon(command)
+	addon := scrapeAddon(requestedAddonString)
+	logInfo(fmt.Sprintf("%+v\n", addon))
+
+	// create and send response
+	if addon.Name == "" {
+		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that add-on :frowning:")
+		return
+	}
+	// construct embed message
+	var embed discordgo.MessageEmbed
+	embed.URL = addon.PageURL
+	embed.Type = "rich"
+	embed.Title = addon.Name
+	embed.Description = addon.Description
+	var thumbnail discordgo.MessageEmbedThumbnail
+	thumbnail.URL = addon.IconURL
+	embed.Thumbnail = &thumbnail
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send message embed. " + err.Error())
+	}
 }
 
 /**

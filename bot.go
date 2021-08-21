@@ -103,6 +103,7 @@ func initCommandInfo() {
 		"leaderboard": {leaderboard},
 		"greeter":     {greeter},
 		"modlog":      {setModLogChannel},
+		"addon":       {handleAddon},
 	}
 }
 
