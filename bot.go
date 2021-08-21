@@ -105,6 +105,7 @@ func initCommandInfo() {
 		"modlog":      {setModLogChannel},
 		"addon":       {handleAddon},
 		"killer":      {handleKiller},
+		"survivor":    {handleSurvivor},
 	}
 }
 

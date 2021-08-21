@@ -13,14 +13,13 @@ import (
 )
 
 type Survivor struct {
-	Name             string
-	IconURL          string
-	Role             string
-	Overview         string
-	Perks            []string
-	PerkURLs         []string
-	PerkDescriptions []string
-	PageURL          string
+	Name     string
+	IconURL  string
+	Role     string
+	Overview string
+	Perks    []string
+	PerkURLs []string
+	PageURL  string
 }
 
 type Killer struct {
@@ -110,6 +109,69 @@ func formatPerk(command []string) string {
 	perk = strings.Replace(perk, "_And", "_&", 1)
 	perk = url.QueryEscape(perk)
 	return perk
+}
+
+/**
+Helper function for handle_survivor. Scrapes HTML from the respective
+page on https://deadbydaylight.gamepedia.com/ and returns the
+desired information in the Survivor struct created above.
+*/
+func scrapeSurvivor(survivor string) Survivor {
+	var resultingSurvivor Survivor
+
+	resultingSurvivor.PageURL = "https://deadbydaylight.gamepedia.com/" + survivor
+
+	// Request the HTML page.
+	doc := loadPage(resultingSurvivor.PageURL)
+
+	if doc == nil {
+		return resultingSurvivor
+	}
+
+	// get name
+	docName := doc.Find("#firstHeading").First()
+	resultingSurvivor.Name = strings.TrimSpace(docName.Text())
+
+	docData := doc.Find(".infoboxtable").First()
+
+	// get icon URL
+	currentSrc := docData.Find("img").First().AttrOr("src", "nil")
+	logInfo(currentSrc)
+	if strings.Contains(currentSrc, ".png") {
+		resultingSurvivor.IconURL = currentSrc
+	}
+
+	currentSrc = docData.Find("img").First().AttrOr("data-src", "nil")
+	logInfo(currentSrc)
+	if strings.Contains(currentSrc, ".png") && resultingSurvivor.IconURL == "" {
+		resultingSurvivor.IconURL = currentSrc
+	}
+
+	// get short data
+	docData.Find("tr").Each(func(i int, s *goquery.Selection) {
+		attribute := s.Find("td").First().Text()
+		switch attribute {
+		case "Role":
+			resultingSurvivor.Role = s.Find("td").Last().Text()
+		default:
+			logWarning("Skipping " + attribute + " while scraping killer")
+		}
+	})
+
+	// get overview
+	resultingSurvivor.Overview = doc.Find("#Overview").First().Parent().Next().Text()
+	if resultingSurvivor.Overview == "" {
+		resultingSurvivor.Overview = doc.Find("#Overview").First().Parent().Next().Next().Text()
+	}
+
+	// get perks
+	docPerks := doc.Find(".wikitable").First()
+	docPerks.Find("tr").Each(func(i int, s *goquery.Selection) {
+		resultingSurvivor.Perks = append(resultingSurvivor.Perks, s.Find("th").Last().Text())
+		resultingSurvivor.PerkURLs = append(resultingSurvivor.PerkURLs, "https://deadbydaylight.gamepedia.com"+s.Find("th").Last().Find("a").AttrOr("href", "nil"))
+	})
+
+	return resultingSurvivor
 }
 
 /**
@@ -319,6 +381,50 @@ func scrapeShrine() Shrine {
 	resultingShrine.TimeUntilReset = "Shrine " + docShrine.Find("th").Last().Text()
 
 	return resultingShrine
+}
+
+/**
+Fetches survivor information from https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki
+and displays the survivor's attributes listed in the Survivor struct.
+**/
+func handleSurvivor(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) < 2 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~survivor <survivor name>`")
+		return
+	}
+	requestedSurvivor := strings.Join(command[1:], " ")
+	requestedSurvivor = strings.ReplaceAll(strings.Title(strings.ToLower(requestedSurvivor)), " ", "_")
+	survivor := scrapeSurvivor(requestedSurvivor)
+	logInfo(fmt.Sprintf("%+v\n", survivor))
+
+	// create and send response
+	if survivor.Name == "" {
+		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that survivor :frowning:")
+		return
+	}
+
+	// construct embed message
+	var embed discordgo.MessageEmbed
+	embed.URL = survivor.PageURL
+	embed.Type = "rich"
+	embed.Title = survivor.Name
+	embed.Description = survivor.Overview
+	var shortdata []*discordgo.MessageEmbedField
+	shortdata = append(shortdata, createField("Role", survivor.Role, false))
+	perkText := ""
+	for i := 0; i < 3; i++ {
+		perkText += fmt.Sprintf("[%s](%s)\n", strings.TrimSpace(survivor.Perks[i]), strings.TrimSpace(survivor.PerkURLs[i]))
+	}
+	logInfo(perkText)
+	shortdata = append(shortdata, createField("Teachable Perks", perkText, false))
+	embed.Fields = shortdata
+	var thumbnail discordgo.MessageEmbedThumbnail
+	thumbnail.URL = survivor.IconURL
+	embed.Thumbnail = &thumbnail
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send message embed. " + err.Error())
+	}
 }
 
 /**
