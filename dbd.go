@@ -120,7 +120,7 @@ func scrapeShrine() Shrine {
 	}
 
 	/** Get Shrine perk info **/
-	docShrine := doc.Find(".wikitable").First()
+	docShrine := doc.Find(".sosTable").First()
 	docShrine.Find("td").Each(func(i int, s *goquery.Selection) {
 		switch i % 3 {
 		case 0:
