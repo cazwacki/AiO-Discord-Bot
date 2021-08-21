@@ -20,6 +20,7 @@ type Survivor struct {
 	Perks            []string
 	PerkURLs         []string
 	PerkDescriptions []string
+	PageURL          string
 }
 
 type Killer struct {
@@ -32,6 +33,9 @@ type Killer struct {
 	TerrorRadius    string
 	Height          string
 	Overview        string
+	Perks           []string
+	PerkURLs        []string
+	PageURL         string
 }
 
 type Addon struct {
@@ -106,6 +110,83 @@ func formatPerk(command []string) string {
 	perk = strings.Replace(perk, "_And", "_&", 1)
 	perk = url.QueryEscape(perk)
 	return perk
+}
+
+/**
+Helper function for handle_killer. Scrapes HTML from the respective
+page on https://deadbydaylight.gamepedia.com/ and returns the
+desired information in the Killer struct created above.
+*/
+func scrapeKiller(killer string) Killer {
+	var resultingKiller Killer
+
+	resultingKiller.PageURL = "https://deadbydaylight.gamepedia.com/" + killer
+
+	// Request the HTML page.
+	doc := loadPage(resultingKiller.PageURL)
+
+	if doc == nil {
+		return resultingKiller
+	}
+
+	// get name
+	docName := doc.Find("#firstHeading").First()
+	resultingKiller.Name = strings.TrimSpace(docName.Text())
+
+	docData := doc.Find(".infoboxtable").First()
+
+	// get icon URL
+	currentSrc := docData.Find("img").First().AttrOr("src", "nil")
+	logInfo(currentSrc)
+	if strings.Contains(currentSrc, ".png") {
+		resultingKiller.IconURL = currentSrc
+	}
+
+	currentSrc = docData.Find("img").First().AttrOr("data-src", "nil")
+	logInfo(currentSrc)
+	if strings.Contains(currentSrc, ".png") && resultingKiller.IconURL == "" {
+		resultingKiller.IconURL = currentSrc
+	}
+
+	// get short data
+	docData.Find("tr").Each(func(i int, s *goquery.Selection) {
+		attribute := s.Find("td").First().Text()
+		switch attribute {
+		case "Realm":
+			resultingKiller.Realm = s.Find("td").Last().Text()
+		case "Power":
+			resultingKiller.Power = s.Find("td").Last().Text()
+		case "Power Attack Type":
+			resultingKiller.PowerAttackType = s.Find("td").Last().Text()
+		case "Movement speed ":
+			resultingKiller.MovementSpeed = s.Find("td").Last().Text()
+		case "Terror Radius ":
+			resultingKiller.TerrorRadius = s.Find("td").Last().Text()
+		case "Height ":
+			resultingKiller.Height = s.Find("td").Last().Text()
+		default:
+			logWarning("Skipping " + attribute + " while scraping killer")
+		}
+	})
+
+	if resultingKiller.PowerAttackType == "" {
+		resultingKiller.PowerAttackType = "Basic Attack"
+	}
+
+	// get overview
+	resultingKiller.Overview = doc.Find("#Overview").First().Parent().Next().Text()
+	if resultingKiller.Overview == "" {
+		resultingKiller.Overview = doc.Find("#Overview").First().Parent().Next().Next().Text()
+	}
+
+	// get perks
+	docPerks := doc.Find(".wikitable").First()
+	docPerks.Find("tr").Each(func(i int, s *goquery.Selection) {
+		resultingKiller.Perks = append(resultingKiller.Perks, s.Find("th").Last().Text())
+		resultingKiller.PerkURLs = append(resultingKiller.PerkURLs, "https://deadbydaylight.gamepedia.com"+s.Find("th").Last().Find("a").AttrOr("href", "nil"))
+	})
+
+	return resultingKiller
 }
 
 /**
@@ -238,6 +319,55 @@ func scrapeShrine() Shrine {
 	resultingShrine.TimeUntilReset = "Shrine " + docShrine.Find("th").Last().Text()
 
 	return resultingShrine
+}
+
+/**
+Fetches killer information from https://deadbydaylight.gamepedia.com/Dead_by_Daylight_Wiki
+and displays the killer's attributes listed in the Killer struct.
+**/
+func handleKiller(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if len(command) < 2 {
+		s.ChannelMessageSend(m.ChannelID, "Usage: `~killer <killer name>`")
+		return
+	}
+	requestedKiller := strings.Join(command[1:], " ")
+	requestedKiller = strings.ReplaceAll(strings.Title(strings.ToLower(requestedKiller)), " ", "_")
+	killer := scrapeKiller(requestedKiller)
+	logInfo(fmt.Sprintf("%+v\n", killer))
+
+	// create and send response
+	if killer.Name == "" {
+		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that killer :frowning:")
+		return
+	}
+
+	// construct embed message
+	var embed discordgo.MessageEmbed
+	embed.URL = killer.PageURL
+	embed.Type = "rich"
+	embed.Title = killer.Name
+	embed.Description = killer.Overview
+	var shortdata []*discordgo.MessageEmbedField
+	shortdata = append(shortdata, createField("Power", killer.Power, false))
+	shortdata = append(shortdata, createField("Movement Speed", killer.MovementSpeed, false))
+	shortdata = append(shortdata, createField("Terror Radius", killer.TerrorRadius, false))
+	shortdata = append(shortdata, createField("Height", killer.Height, false))
+	shortdata = append(shortdata, createField("Power Attack Type", killer.PowerAttackType, false))
+	shortdata = append(shortdata, createField("Realm", killer.Realm, false))
+	perkText := ""
+	for i := 0; i < 3; i++ {
+		perkText += fmt.Sprintf("[%s](%s)\n", strings.TrimSpace(killer.Perks[i]), strings.TrimSpace(killer.PerkURLs[i]))
+	}
+	logInfo(perkText)
+	shortdata = append(shortdata, createField("Teachable Perks", perkText, false))
+	embed.Fields = shortdata
+	var thumbnail discordgo.MessageEmbedThumbnail
+	thumbnail.URL = killer.IconURL
+	embed.Thumbnail = &thumbnail
+	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send message embed. " + err.Error())
+	}
 }
 
 /**

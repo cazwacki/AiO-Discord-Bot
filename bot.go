@@ -104,6 +104,7 @@ func initCommandInfo() {
 		"greeter":     {greeter},
 		"modlog":      {setModLogChannel},
 		"addon":       {handleAddon},
+		"killer":      {handleKiller},
 	}
 }
 
