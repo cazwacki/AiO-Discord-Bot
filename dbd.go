@@ -12,6 +12,35 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+type Survivor struct {
+	Name             string
+	IconURL          string
+	Role             string
+	Overview         string
+	Perks            []string
+	PerkURLs         []string
+	PerkDescriptions []string
+}
+
+type Killer struct {
+	Name            string
+	IconURL         string
+	Realm           string
+	Power           string
+	PowerAttackType string
+	MovementSpeed   string
+	TerrorRadius    string
+	Height          string
+	Overview        string
+}
+
+type Addon struct {
+	Name        string
+	IconURL     string
+	Description string
+	PageURL     string
+}
+
 // Perk : contains information about the perk pulled from the wiki
 type Perk struct {
 	Name        string
