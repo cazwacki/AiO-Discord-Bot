@@ -332,6 +332,7 @@ func scrapePerk(perk string) Perk {
 	// remove impurities
 	description := strings.ReplaceAll(docDescText, " .", ".")
 	description = strings.ReplaceAll(description, "&#34;", "\"")
+	description = strings.ReplaceAll(description, "&#39;", "'")
 	description = strings.ReplaceAll(description, ".", ".\n")
 	description = strings.ReplaceAll(description, "  ", " ")
 	description = strings.ReplaceAll(description, " %", "%")
