@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/url"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -316,11 +317,22 @@ func scrapePerk(perk string) Perk {
 	resultingPerk.Name = docName.Text()
 
 	/** Get Description **/
-	docDesc := doc.Find(".wikitable").First().Find("td").Last()
+	docDesc := doc.Find(".wikitable").First().Find(".formattedPerkDesc").Last()
 
-	docDescText := strings.ReplaceAll(docDesc.Text(), "\n", " ")
+	// docDescText := docDesc.Text()
+	html, err := docDesc.Html()
+	if err != nil {
+		resultingPerk.Name = ""
+		return resultingPerk
+	}
+	r := regexp.MustCompile(`<.*?>`)
+	docDescText := r.ReplaceAllString(html, "")
+	// strings.ReplaceAll(docDesc.Text(), "\n", " ")
+
 	// remove impurities
 	description := strings.ReplaceAll(docDescText, " .", ".")
+	description = strings.ReplaceAll(description, "&#34;", "\"")
+	description = strings.ReplaceAll(description, ".", ".\n")
 	description = strings.ReplaceAll(description, "  ", " ")
 	description = strings.ReplaceAll(description, " %", "%")
 
