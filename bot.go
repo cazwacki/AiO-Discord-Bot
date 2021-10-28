@@ -126,6 +126,7 @@ func runBot(token string) {
 	joinLeaveTable = os.Getenv("JOIN_LEAVE_TABLE")
 	autokickTable = os.Getenv("AUTOKICK_TABLE")
 	modLogTable = os.Getenv("MODLOG_TABLE")
+	autoshrineTable = os.Getenv("AUTOSHRINE_TABLE")
 
 	// open connection to database
 	retry := 90
@@ -157,11 +158,13 @@ func runBot(token string) {
 	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
 	createAutokickTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, days_until_kick int(11));", autokickTable)
 	createModLogTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, channel_id char(20));", modLogTable)
+	createAutoshrineTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, channel_id char(20));", autoshrineTable)
 	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
 	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
 	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
 	queryWithoutResults(createAutokickTableSQL, "Unable to create autokick table!")
 	queryWithoutResults(createModLogTableSQL, "Unable to create mod log table!")
+	queryWithoutResults(createAutoshrineTableSQL, "Unable to create autoshrine table!")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
