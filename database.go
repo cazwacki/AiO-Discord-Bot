@@ -843,7 +843,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 
 		var contents []*discordgo.MessageEmbedField
-		for i := 0; i < 6 && i < len(inactiveUsers); i++ {
+		for i := 0; i < 8 && i < len(inactiveUsers); i++ {
 			// calculate difference between time.Now() and the provided timestamp
 			dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 			lastActive, err := time.Parse(dateFormat, strings.Split(inactiveUsers[i].LastActive, " m=")[0])
