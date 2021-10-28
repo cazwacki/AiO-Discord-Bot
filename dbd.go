@@ -2,13 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"regexp"
 	"strings"
 	"unicode"
 
-	"github.com/ChimeraCoder/anaconda"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/bwmarrin/discordgo"
 )
@@ -598,97 +596,4 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		return
 	}
 	logSuccess("Sent shrine embed")
-}
-
-/**
-When a new shrine tweet is received, construct a message and post it to the designated
-autoshrine channel.
-*/
-func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
-	if strings.HasPrefix(v.Text, "This week's shrine is") && v.User.Id == 4850837842 {
-		// construct embed response
-		var embed discordgo.MessageEmbed
-		splitText := strings.Split(strings.ReplaceAll(v.FullText, "&amp;", "&"), " ")
-		embed.URL = splitText[len(splitText)-1]
-		embed.Type = "rich"
-		embed.Title = "Latest Shrine (@DeadbyBHVR)"
-		embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
-		var image discordgo.MessageEmbedImage
-		image.URL = v.Entities.Media[0].Media_url
-		embed.Image = &image
-		var thumbnail discordgo.MessageEmbedThumbnail
-		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
-		embed.Thumbnail = &thumbnail
-
-		// attempt to read channel identity from file
-		buf, err := ioutil.ReadFile("./autoshrine_channel")
-		if err != nil {
-			logError("Unable to read file for autoshrine channel. " + err.Error())
-			handleTweet(s, v)
-			return
-		}
-
-		// send response
-		_, err = s.ChannelMessageSendEmbed(string(buf), &embed)
-		if err != nil {
-			logError("Failed to send tweet embed! " + err.Error())
-			return
-		}
-	}
-}
-
-/**
-Helper function for Handle_autoshrine. Writes the new channel to file.
-*/
-func setNewChannel(channel string) bool {
-	err := ioutil.WriteFile("./autoshrine_channel", []byte(channel), 0644)
-	if err != nil {
-		logError("Failed to write new autoshrine! " + err.Error())
-		return false
-	}
-	return true
-}
-
-/**
-Switches the channel that the tweet monitoring system will output to.
-**/
-func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	// correct usage of autoshrine?
-	if len(command) != 2 {
-		logInfo("User passed in incorrect number of arguments")
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine #<channel>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
-		return
-	}
-
-	// is the second field a channel?
-	if !strings.HasPrefix(command[1], "<#") {
-		logInfo("User passed in invalid channel")
-		_, err := s.ChannelMessageSend(m.ChannelID, "Please pass in a valid channel.")
-		if err != nil {
-			logError("Failed to send invalid channel message! " + err.Error())
-			return
-		}
-		return
-	}
-
-	// remove formatting
-	channel := strings.ReplaceAll(command[1], "<#", "")
-	channel = strings.ReplaceAll(channel, ">", "")
-	if setNewChannel(channel) {
-		_, err := s.ChannelMessageSend(m.ChannelID, ":slight_smile: Got it. I'll start posting the new shrines on <#"+channel+"> !")
-		if err != nil {
-			logError("Failed to send successful update message! " + err.Error())
-			return
-		}
-	} else {
-		_, err := s.ChannelMessageSend(m.ChannelID, ":frowning: I couldn't update the autoshrine. Try again in a moment...")
-		if err != nil {
-			logError("Failed to send failed update message! " + err.Error())
-			return
-		}
-	}
-	logSuccess("Updated autoshrine")
 }

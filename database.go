@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -24,6 +25,7 @@ var leaderboardTable string
 var joinLeaveTable string
 var autokickTable string
 var modLogTable string
+var autoshrineTable string
 
 type AutoKickData struct {
 	GuildID       string `json:"guild_id"`
@@ -1069,6 +1071,127 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		if err != nil {
 			logError("Failed to send activity usage message! " + err.Error())
 		}
+	}
+}
+
+/**
+When a new shrine tweet is received, construct a message and post it to the designated
+autoshrine channel.
+*/
+func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
+	if strings.HasPrefix(v.Text, "This week's shrine is") && v.User.Id == 4850837842 {
+		selectSQL := fmt.Sprintf("SELECT * FROM %s", autoshrineTable)
+		query, err := connection_pool.Query(selectSQL)
+		if err != nil {
+			logError("SELECT query error, so stopping execution: " + err.Error())
+			return
+		}
+		defer query.Close()
+
+		for query.Next() {
+			// write and send embed
+			var autoshrineData ModLogData
+			err = query.Scan(&autoshrineData.GuildID, &autoshrineData.ChannelID)
+			if err != nil {
+				logError("Unable to parse database information! Aborting. " + err.Error())
+				return
+			}
+
+			// construct embed response
+			var embed discordgo.MessageEmbed
+			splitText := strings.Split(strings.ReplaceAll(v.FullText, "&amp;", "&"), " ")
+			embed.URL = splitText[len(splitText)-1]
+			embed.Type = "rich"
+			embed.Title = "Latest Shrine (@DeadbyBHVR)"
+			embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
+			var image discordgo.MessageEmbedImage
+			image.URL = v.Entities.Media[0].Media_url
+			embed.Image = &image
+			var thumbnail discordgo.MessageEmbedThumbnail
+			thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
+			embed.Thumbnail = &thumbnail
+
+			// send response
+			_, err = s.ChannelMessageSendEmbed(autoshrineData.ChannelID, &embed)
+			if err != nil {
+				logError("Failed to send tweet embed! " + err.Error())
+				return
+			}
+		}
+	}
+}
+
+/**
+Switches the channel that the tweet monitoring system will output to.
+**/
+func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage this.")
+		if err != nil {
+			logError("Failed to send permissions message! " + err.Error())
+		}
+		return
+	}
+	if len(command) != 3 && len(command) != 2 {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~autoshrine set #channel / ~autoshrine reset`")
+		if err != nil {
+			logError("Failed to send usage message! " + err.Error())
+		}
+		return
+	}
+	switch command[1] {
+	case "set":
+		// create or update entry in database
+		channel := strings.ReplaceAll(command[2], "<#", "")
+		channel = strings.ReplaceAll(channel, ">", "")
+		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
+		if !matched {
+			logInfo("User did not specify channel correctly")
+			_, err := s.ChannelMessageSend(m.ChannelID, "You must specify the channel correctly.")
+			if err != nil {
+				logError("Failed to send autoshrine channel error message! " + err.Error())
+			}
+			return
+		}
+
+		// remove old channel if it exists
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autoshrineTable, m.GuildID)
+		if queryWithoutResults(deleteSQL, "Unable to delete old autoshrine channel!") {
+			logSuccess("Removed old autoshrine channel")
+		} else {
+			logWarning("Couldn't remove old autoshrine channel! Is the connection still available?")
+		}
+
+		// add new channel
+		insertSQL := fmt.Sprintf("INSERT INTO %s (guild_id, channel_id) VALUES ('%s', '%s');",
+			autoshrineTable, m.GuildID, channel)
+		if queryWithoutResults(insertSQL, "Unable to set new autoshrine channel!") {
+			logSuccess("Added new autoshrine channel")
+		} else {
+			logWarning("Couldn't add new autoshrine channel! Is the connection still available?")
+		}
+
+		_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Set the autoshrine log channel to <#%s>!", channel))
+		if err != nil {
+			logError("Failed to send autoshrine channel success message! " + err.Error())
+			return
+		}
+		logSuccess("Set new autoshrine channel")
+	case "reset":
+		// remove old channel if it exists
+		deleteSQL := fmt.Sprintf("DELETE FROM %s WHERE (guild_id = '%s');", autoshrineTable, m.GuildID)
+		if queryWithoutResults(deleteSQL, "Unable to delete old autoshrine channel!") {
+			logSuccess("Removed old autoshrine channel")
+		} else {
+			logWarning("Couldn't remove old autoshrine channel! Is the connection still available?")
+		}
+
+		_, err := s.ChannelMessageSend(m.ChannelID, "I'll stop posting shrines until you set a new channel. :slight_smile:")
+		if err != nil {
+			logError("Failed to send autoshrine channel success message! " + err.Error())
+			return
+		}
+		logSuccess("Reset autoshrine channel")
 	}
 }
 
