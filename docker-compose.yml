@@ -32,3 +32,4 @@ services:
       JOIN_LEAVE_TABLE: join_leave_messages
       AUTOKICK_TABLE: autokick
       MODLOG_TABLE: modlogs
+      AUTOSHRINE_TABLE: autoshrine
