@@ -106,6 +106,7 @@ func initCommandInfo() {
 		"addon":       {handleAddon},
 		"killer":      {handleKiller},
 		"survivor":    {handleSurvivor},
+		"emoji":       {emoji},
 	}
 }
 

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"regexp"
 	"strconv"
@@ -799,4 +802,263 @@ func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 		return
 	}
 	attemptCopy(s, m, command, false)
+}
+
+/**
+Allows user to create, remove, or edit emojis associated with the server.
+**/
+func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
+	// validate calling user has permission to manage emojis
+	if !userHasValidPermissions(s, m, discordgo.PermissionManageEmojis) {
+		_, err := s.ChannelMessageSend(m.ChannelID, "Sorry, you aren't allowed to manage emojis.")
+		if err != nil {
+			logError("Failed to send permissions message! " + err.Error())
+		}
+		return
+	}
+
+	if len(command) == 1 {
+		// send usage information
+		var embed discordgo.MessageEmbed
+		embed.Type = "rich"
+		embed.Title = "Emoji Commands"
+		embed.Description = "Create, delete, or edit your server emojis quickly and easily."
+
+		var contents []*discordgo.MessageEmbedField
+		contents = append(contents, createField("emoji create <name> <url>", "Create a new server emoji with the given name using the image from the provided URL.", false))
+		contents = append(contents, createField("emoji rename <emoji> <new name>", "Set an existing emoji's name to the name passed in <new name>.", false))
+		contents = append(contents, createField("emoji delete <emoji>", "Remove the selected emoji from the server.", false))
+		embed.Fields = contents
+
+		_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send instructions message embed! " + err.Error())
+			return
+		}
+		logSuccess("Sent user help embed for emoji")
+		return
+	}
+
+	// which command was invoked?
+	switch command[1] {
+	case "create":
+		logInfo("User invoked create for emoji command")
+		// verify correct number of arguments
+		if len(command) != 4 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage:\n`emoji create <name> <url>`")
+			if err != nil {
+				logError("Failed to send permissions message! " + err.Error())
+			}
+			return
+		}
+
+		// verify alphanumeric and underscores
+		matched, err := regexp.MatchString(`^[a-zA-Z0-9_]*$`, command[1])
+		if err != nil {
+			logError("Failed to match regex! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to determine whether the name provided was valid.")
+			if err != nil {
+				logError("Failed to send regex error message! " + err.Error())
+			}
+			return
+		}
+		if !matched {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid name. Please provide a name using alphanumeric characters or underscores only.")
+			if err != nil {
+				logError("Failed to send invalid name message! " + err.Error())
+			}
+			return
+		}
+
+		// convert image to base64 string
+		resp, err := http.Get(command[3])
+		if err != nil {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to get a response from the provided URL.")
+			if err != nil {
+				logError("Failed to send response error message! " + err.Error())
+			}
+			return
+		}
+
+		defer resp.Body.Close()
+
+		bytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to read the response from the provided URL.")
+			if err != nil {
+				logError("Failed to send read response error message! " + err.Error())
+			}
+			return
+		}
+
+		var base64Image string
+		mimeType := http.DetectContentType(bytes)
+
+		switch mimeType {
+		case "image/jpeg":
+			base64Image += "data:image/jpeg;base64,"
+		case "image/png":
+			base64Image += "data:image/png;base64,"
+		case "image/gif":
+			base64Image += "data:image/gif;base64,"
+		default:
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid URL provided. Please provide a jp(e)g, png, or gif image URL.")
+			if err != nil {
+				logError("Failed to send read response error message! " + err.Error())
+			}
+			return
+		}
+
+		size, err := strconv.Atoi(resp.Header.Get("Content-Length"))
+		if err != nil {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Unable to detect file size from provided image URL.")
+			if err != nil {
+				logError("Failed to send file size detection error message! " + err.Error())
+			}
+			return
+		}
+		downloadSize := int64(size)
+
+		if downloadSize > 262144 {
+			logError("Failed to create new emoji due to size constraints!")
+			_, err := s.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Please choose an image with smaller file size. Image has a size %.1fKB, which is > 256KB.", float64(downloadSize)/float64(1024.0)))
+			if err != nil {
+				logError("Failed to send image size error message! " + err.Error())
+			}
+			return
+		}
+
+		base64Image += base64.StdEncoding.EncodeToString(bytes)
+
+		emoji, err := s.GuildEmojiCreate(m.GuildID, command[2], base64Image, nil)
+		if err != nil {
+			logError("Failed to create new emoji!" + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to create new emoji.\n```\n"+err.Error()+"```")
+			if err != nil {
+				logError("Failed to send read response error message! " + err.Error())
+			}
+			return
+		}
+
+		logSuccess("Created new emoji successfully")
+		_, err = s.ChannelMessageSend(m.ChannelID, "Created emoji successfully! "+emoji.MessageFormat())
+		if err != nil {
+			logError("Failed to send read response error message! " + err.Error())
+		}
+	case "delete":
+		logInfo("User invoked delete for emoji command")
+		// verify correct number of arguments
+		if len(command) != 3 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage:\n`emoji delete <emoji>`")
+			if err != nil {
+				logError("Failed to send permissions message! " + err.Error())
+			}
+			return
+		}
+
+		// validate emoji string formatting
+		matched, err := regexp.MatchString(`^(<a?)?:\w+:(\d{18}>)$`, command[2])
+		if err != nil {
+			logError("Failed to match regex! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to determine whether the emoji was valid.")
+			if err != nil {
+				logError("Failed to send regex error message! " + err.Error())
+			}
+			return
+		}
+		if !matched {
+			logError("Regex did not match!")
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid argument. Please provide a valid server emoji.")
+			if err != nil {
+				logError("Failed to send invalid emoji message! " + err.Error())
+			}
+			return
+		}
+
+		emojiID := strings.TrimSuffix(strings.Split(command[2], ":")[len(strings.Split(command[2], ":"))-1], ">")
+
+		err = s.GuildEmojiDelete(m.GuildID, emojiID)
+		if err != nil {
+			logError("Failed to remove emoji from the server! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to remove emoji from the server.\n```\n"+err.Error()+"```")
+			if err != nil {
+				logError("Failed to send invalid emoji message! " + err.Error())
+			}
+			return
+		}
+
+		logSuccess("Successfully deleted emoji")
+		_, err = s.ChannelMessageSend(m.ChannelID, "Removed the emoji from the server.")
+		if err != nil {
+			logError("Failed to send success emoji deletion message! " + err.Error())
+		}
+		return
+	case "rename":
+		logInfo("User invoked rename for emoji command")
+		// verify correct number of arguments
+		if len(command) != 4 {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Usage:\n`emoji rename <emoji> <new name>`")
+			if err != nil {
+				logError("Failed to send permissions message! " + err.Error())
+			}
+			return
+		}
+
+		// verify valid emoji formatting provided for 2
+		matched, err := regexp.MatchString(`^(<a?)?:\w+:(\d{18}>)$`, command[2])
+		if err != nil {
+			logError("Failed to match regex! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to determine whether the emoji was valid.")
+			if err != nil {
+				logError("Failed to send regex error message! " + err.Error())
+			}
+			return
+		}
+		if !matched {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid argument. Please provide a valid server emoji.")
+			if err != nil {
+				logError("Failed to send invalid emoji message! " + err.Error())
+			}
+			return
+		}
+
+		// verify name is alphanumeric for 3
+		matched, err = regexp.MatchString(`^[a-zA-Z0-9_]*$`, command[3])
+		if err != nil {
+			logError("Failed to match regex! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to determine whether the name provided was valid.")
+			if err != nil {
+				logError("Failed to send regex error message! " + err.Error())
+			}
+			return
+		}
+		if !matched {
+			_, err := s.ChannelMessageSend(m.ChannelID, "Invalid name. Please provide a name using alphanumeric characters or underscores only.")
+			if err != nil {
+				logError("Failed to send invalid name message! " + err.Error())
+			}
+			return
+		}
+
+		emojiID := strings.TrimSuffix(strings.Split(command[2], ":")[len(strings.Split(command[2], ":"))-1], ">")
+
+		// set new name
+		_, err = s.GuildEmojiEdit(m.GuildID, emojiID, command[3], nil)
+		if err != nil {
+			logError("Failed to rename emoji! " + err.Error())
+			_, err := s.ChannelMessageSend(m.ChannelID, "Failed to rename the emoji.\n```\n"+err.Error()+"```")
+			if err != nil {
+				logError("Failed to send unsuccessful rename emoji message! " + err.Error())
+			}
+			return
+		}
+
+		logSuccess("Successfully renamed emoji")
+		_, err = s.ChannelMessageSend(m.ChannelID, "Renamed the emoji to "+command[3]+".")
+		if err != nil {
+			logError("Failed to send success emoji rename message! " + err.Error())
+		}
+		return
+	}
 }
