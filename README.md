@@ -21,39 +21,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 
 (The bot detects message links. If the source message is in the guild, it will output it in the chat after the user's message.)
 
-### Standard / Management
-- [x] ~nick @user (new username): If you have the permissions, nickname the specified user on the server.
-- [x] ~kick @user (reason: optional): Kick the specified user from the server.
-- [x] ~ban @user (reason: optional): Ban the specified user from the server.
-- [x] ~uptime: Reports the bot's current uptime.
-- [x] ~shutdown: Shuts down the bot. Note that if the bot is deployed on a webservice like Heroku, it will probably immediately restart by design.
-- [x] ~purge (number): Removes the (number) most recent messages.
-- [x] ~mv (number) (#channel): Moves the last (number) messages from the channel it is invoked in and moves them to (#channel).
-- [x] ~cp (number) (#channel): Copies the last (number) messages from the channel it is invoked in and moves them to (#channel).
-- [x] ~activity list (number): Returns a report of users who have been inactive for (number) days or more.
-- [x] ~activity user @user: Returns the user's last sign of activity.
-- [x] ~activity rescan: (Should be useless most of the time) Checks for any users in a server that are not in the database, and adds them to it.
-- [x] ~activity whitelist @user (true / false): Adds or removes a user from the auto-kick whitelist. They will have a mark that they are protected in activity list and user.
-- [x] ~activity autokick (number of days of inactivity: optional): Sets the server's auto-kick to occur when non-whitelisted users have been inactive for the specified number of days. If set to < 1, then the autokick is deactivated. If you do not include a number, it tells you the current state of auto-kick.
-- [x] ~about @user: Get user details related to the Guild the message was called in. 
-- [x] ~leaderboard: Get top 10 (or top x where x is the number of people who have sent a message) users with the highest chat scores. 
-- [x] ~greeter help: Provides information on how to set messages to be sent on members entering / exiting a server. 
-- [x] ~modlog set (#channel): Provides kick, ban, and unban logs for tracking purposes.
-- [x] ~modlog reset: Stops the bot from posting kick, ban, and unban logs until a new channel is provided.
-  
-### Dead By Daylight Commands
-- [x] ~perk (perk name): Scrapes https://deadbydaylight.gamepedia.com/ for the perk and outputs its description.
-- [x] ~shrine: Scrapes the current Shrine of Secrets from https://deadbydaylight.gamepedia.com/.
-- [x] ~autoshrine (#channel): Changes the channel where Tweets about the newest shrine from @DeadbyBHVR are posted.
-  
-### Lookup Commands
-- [x] ~define (word / phrase): Returns a definition of the word / phrase if it is available.
-- [x] ~wiki (word / phrase): Returns the extract of the topic from Wikipedia if it is available.
-- [x] ~urban (word / phrase): Returns the first five definitions of a word / phrase from Urban Dictionary if available.
-- [x] ~google (word / phrase): Returns the first five results from Google Search Engine.
-- [x] ~image (word / phrase): Returns the first image from Google Search Engine
-- [x] ~convert (time) (IANA time zone): Returns the local time converted from the time passed in.
-- [x] ~help: Returns how to use each of the commands the bot has available.
+Commands are available at https://charles.zawackis.com/bot-commands.html.
 
 ## Things I Have Learned
 
