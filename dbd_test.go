@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -43,15 +42,6 @@ func TestDBD(t *testing.T) {
 		}
 		if perk.Quote != "\"U mad?\" — Feng Min " {
 			t.Logf("Failed to populate quote correctly: '" + perk.Quote + "'")
-			t.Fail()
-		}
-	})
-
-	t.Run("~autoshrine actually changes the file", func(t *testing.T) {
-		setNewChannel("731158169174409216")
-		currentChannel, _ := ioutil.ReadFile("./autoshrine_channel")
-		if string(currentChannel) != "731158169174409216" {
-			t.Logf("Failed to change autoshrine channel; " + string(currentChannel))
 			t.Fail()
 		}
 	})
