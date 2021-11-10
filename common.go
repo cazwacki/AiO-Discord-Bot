@@ -106,3 +106,14 @@ func stripUserID(raw string) string {
 	raw = strings.TrimPrefix(raw, "!")
 	return raw
 }
+
+/**
+Sends a message and automatically handles the error gracefully.
+*/
+func attemptSendMsg(s *discordgo.Session, m *discordgo.MessageCreate, message string) {
+	_, err := s.ChannelMessageSend(m.ChannelID, message)
+	if err != nil {
+		logError("Failed to send message with contents: " + message + "\n" + err.Error())
+		return
+	}
+}

@@ -273,14 +273,7 @@ Takes a passed in time and uses the Discord embed timestamp feature to convert i
 func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if len(command) != 3 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.")
-		if err != nil {
-			logError("Failed to send usage message 1! " + err.Error())
-		}
-		_, err = s.ChannelMessageSend(m.ChannelID, "`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
-		if err != nil {
-			logError("Failed to send usage message 2! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.\n\n`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
 		return
 	}
 
@@ -297,10 +290,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	location, err := time.LoadLocation(cmdTimezone)
 	if err != nil {
 		logError("Error loading location! " + err.Error())
-		_, msgErr := s.ChannelMessageSend(m.ChannelID, "Couldn't recognize that timezone.")
-		if msgErr != nil {
-			logError("Failed to send 'unrecognized timezone' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Couldn't recognize that timezone.")
 		return
 	}
 	today := time.Now().In(location)
@@ -317,10 +307,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	}
 
 	if !successful_parse {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Couldn't parse that time.")
-		if err != nil {
-			logError("Failed to send 'parse failed' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Couldn't parse that time.")
 		return
 	}
 
@@ -328,11 +315,8 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	discordTimestamp := "2006-01-02T15:04:05.999Z"
 	utc, err := time.LoadLocation("UTC")
 	if err != nil {
-		fmt.Println("Error loading UTC! " + err.Error())
-		_, msgErr := s.ChannelMessageSend(m.ChannelID, "Couldn't convert to UTC.")
-		if msgErr != nil {
-			logError("Failed to send 'unable to load location' message! " + err.Error())
-		}
+		logError("Error loading UTC! " + err.Error())
+		attemptSendMsg(s, m, "Couldn't convert to UTC.")
 		return
 	}
 
@@ -363,10 +347,7 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~urban <word/phrase>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~urban <word/phrase>`")
 		return
 	}
 
@@ -375,10 +356,7 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	// did the API return any definition?
 	if len(terms.UrbanEntries) == 0 {
-		_, err := s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here, dawg...")
-		if err != nil {
-			logError("Failed to send 'no definition' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, ":books: :frowning: Couldn't find a definition for that in here, dawg...")
 		return
 	}
 
@@ -424,10 +402,7 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~define <word/phrase>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~define <word/phrase>`")
 		return
 	}
 
@@ -436,10 +411,7 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 	// did the API return any definition?
 	if len(terms.Entries) == 0 {
-		_, err := s.ChannelMessageSend(m.ChannelID, ":books: :frowning: Couldn't find a definition for that in here...")
-		if err != nil {
-			logError("Failed to send 'no definition' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, ":books: :frowning: Couldn't find a definition for that in here...")
 		return
 	}
 
@@ -489,10 +461,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~google <word / phrase>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~google <word / phrase>`")
 		return
 	}
 	results := fetchResults(strings.Join(command[1:], " "), 5)
@@ -500,11 +469,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	// did any results come in?
 	if len(results) == 0 {
 		logWarning("No results came in. Did the website change or were there genuinely no results?")
-		_, err := s.ChannelMessageSend(m.ChannelID, "Unable to fetch Google results. Try again later :frowning:")
-		if err != nil {
-			logError("Failed to send 'failed to find results' message! " + err.Error())
-			return
-		}
+		attemptSendMsg(s, m, "Unable to fetch Google results. Try again later :frowning:")
 		return
 	}
 
@@ -539,21 +504,16 @@ to the channel with emotes that can be used to scroll between images.
 func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	// did the user format the command correctly?
 	if len(command) == 1 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~image <word / phrase>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~image <word / phrase>`")
 		return
 	}
+
 	result := fetchImage(strings.Join(command[1:], " "))
 
 	// did the search engine return anything?
 	if len(result.Images) == 0 {
 		logWarning("No images were found. Is there a problem with the CustomSearch API?")
-		_, err := s.ChannelMessageSend(m.ChannelID, ":frame_photo: :frowning: Couldn't find that for you.")
-		if err != nil {
-			logError("Failed to send 'no images' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, ":frame_photo: :frowning: Couldn't find that for you.")
 		return
 	}
 
@@ -599,10 +559,7 @@ func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
-		_, err := s.ChannelMessageSend(m.ChannelID, "Usage: `~wiki <word / phrase>`")
-		if err != nil {
-			logError("Failed to send usage message! " + err.Error())
-		}
+		attemptSendMsg(s, m, "Usage: `~wiki <word / phrase>`")
 		return
 	}
 	query := strings.Join(command[1:], "_")
@@ -626,10 +583,7 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	page = fetchArticle(query)
 
 	if page.URLs == nil {
-		_, err := s.ChannelMessageSend(m.ChannelID, ":frowning: Couldn't find an article for that. Sorry!")
-		if err != nil {
-			logError("Failed to send 'no articles' message! " + err.Error())
-		}
+		attemptSendMsg(s, m, ":frowning: Couldn't find an article for that. Sorry!")
 		logSuccess("No articles found, but no errors")
 		return
 	}
