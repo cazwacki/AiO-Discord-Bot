@@ -462,10 +462,12 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]{18}\/[0-9]{18}\/[0-9]{18}`)
-	match := regex.FindStringSubmatch(m.Content)
-	if match != nil {
-		// verify the message came from within the guild
-		linkData := strings.Split(match[0], "/")
+	match := regex.FindAllStringSubmatch(m.Content, -1)
+	logInfo(fmt.Sprintf("Number of matches is %d", len(match)))
+
+	// verify the message came from within the guild
+	for _, link := range match {
+		linkData := strings.Split(link[0], "/")
 		if linkData[4] == m.GuildID {
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
