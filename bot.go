@@ -154,18 +154,24 @@ func runBot(token string) {
 	connection_pool = db
 
 	// create tables if they don't exist
-	createActivityTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80), whitelist boolean);", activityTable)
-	createLeaderboardTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,	guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));", leaderboardTable)
-	createJoinLeaveTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));", joinLeaveTable)
-	createAutokickTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, days_until_kick int(11));", autokickTable)
-	createModLogTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, channel_id char(20));", modLogTable)
-	createAutoshrineTableSQL := fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (guild_id char(20) PRIMARY KEY, channel_id char(20));", autoshrineTable)
-	queryWithoutResults(createActivityTableSQL, "Unable to create activity table!")
-	queryWithoutResults(createLeaderboardTableSQL, "Unable to create leaderboard table!")
-	queryWithoutResults(createJoinLeaveTableSQL, "Unable to create join / leave table!")
-	queryWithoutResults(createAutokickTableSQL, "Unable to create autokick table!")
-	queryWithoutResults(createModLogTableSQL, "Unable to create mod log table!")
-	queryWithoutResults(createAutoshrineTableSQL, "Unable to create autoshrine table!")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+activityTable+" (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), last_active char(70), description char(80), whitelist boolean);",
+		"Created activity table",
+		"Unable to create activity table")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+leaderboardTable+" (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), member_id char(20), member_name char(40), points int(11), last_awarded char(70));",
+		"Created leaderboard table",
+		"Failed to create leaderboard table")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+joinLeaveTable+" (entry int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY, guild_id char(20), channel_id char(20), message_type char(5), image_link varchar(1000), message varchar(2000));",
+		"Created join/leave table",
+		"Failed to create join/leave table")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+autokickTable+" (guild_id char(20) PRIMARY KEY, days_until_kick int(11));",
+		"Created autokick table",
+		"Failed to create autokick table")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+modLogTable+" (guild_id char(20) PRIMARY KEY, channel_id char(20));",
+		"Created mod log table",
+		"Failed to create mod log table")
+	attemptQuery("CREATE TABLE IF NOT EXISTS "+autoshrineTable+" (guild_id char(20) PRIMARY KEY, channel_id char(20));",
+		"Created auto shrine table",
+		"Failed to create auto shrine table")
 
 	/** Open Connection to Discord **/
 	if os.Getenv("PROD_MODE") == "true" {
@@ -228,61 +234,62 @@ func runAutoKicker(dg *discordgo.Session) {
 	for {
 		logWarning("Performing auto-kick")
 		// 1. get days_until_kick for each guild
-		selectSQL := fmt.Sprintf("SELECT * FROM %s;", autokickTable)
-		query, err := connection_pool.Query(selectSQL)
+		query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s;", autokickTable))
 		if err != nil {
 			logError("SELECT query error: " + err.Error())
-		} else {
-			for query.Next() {
-				var autokickData AutoKickData
-				err = query.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
+			return
+		}
+
+		for query.Next() {
+			var autokickData AutoKickData
+			err = query.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
+			if err != nil {
+				logError("Unable to parse database information! Aborting. " + err.Error())
+				return
+			}
+
+			// 2. get all users from member activity table that are not whitelisted and are in the given guild
+			memberQuery, err := connection_pool.Query("SELECT * FROM ? WHERE (guild_id = '?' AND whitelist = false);", activityTable, autokickData.GuildID)
+			if err != nil {
+				logError("SELECT query error: " + err.Error())
+				return
+			}
+
+			for memberQuery.Next() {
+				var memberActivity MemberActivity
+				err = memberQuery.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 				if err != nil {
 					logError("Unable to parse database information! Aborting. " + err.Error())
+					continue
+				}
+				dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
+				// calculate difference between time.Now() and the provided timestamp
+				lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
+				if err != nil {
+					logError("Unable to parse database timestamps! Aborting. " + err.Error())
 					return
-				} else {
-					// 2. get all users from member activity table that are not whitelisted and are in the given guild
-					selectSQL = fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = '%s' AND whitelist = false);", activityTable, autokickData.GuildID)
-					memberQuery, err := connection_pool.Query(selectSQL)
+				}
+
+				lastActive = lastActive.AddDate(0, 0, autokickData.DaysUntilKick)
+				if lastActive.Before(time.Now()) {
+					// kick user
+					err = dg.GuildMemberDeleteWithReason(autokickData.GuildID, memberActivity.MemberID, fmt.Sprintf("Bot detected %d or more days of inactivity.", autokickData.DaysUntilKick))
 					if err != nil {
-						logError("SELECT query error: " + err.Error())
-					} else {
-						for memberQuery.Next() {
-							var memberActivity MemberActivity
-							err = memberQuery.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
-							if err != nil {
-								logError("Unable to parse database information! Aborting. " + err.Error())
-							} else {
-								dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
-								// calculate difference between time.Now() and the provided timestamp
-								lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
-								if err != nil {
-									logError("Unable to parse database timestamps! Aborting. " + err.Error())
-								} else {
-									lastActive = lastActive.AddDate(0, 0, autokickData.DaysUntilKick)
-									if lastActive.Before(time.Now()) {
-										// kick user
-										err = dg.GuildMemberDeleteWithReason(autokickData.GuildID, memberActivity.MemberID, fmt.Sprintf("Bot detected %d or more days of inactivity.", autokickData.DaysUntilKick))
-										if err != nil {
-											logError("Unable to kick user! " + err.Error())
-										}
-										guild, err := dg.Guild(autokickData.GuildID)
-										if err != nil {
-											logError("Unable to load guild! " + err.Error())
-										}
-										guildName := "error: could not retrieve"
-										if guild != nil {
-											guildName = guild.Name
-										}
-										dmUser(dg, memberActivity.MemberID, fmt.Sprintf("You have been automatically kicked from **%s** due to %d or more days of inactivity.", guildName, autokickData.DaysUntilKick))
-									}
-								}
-							}
-						}
+						logError("Unable to kick user! " + err.Error())
 					}
+					guild, err := dg.Guild(autokickData.GuildID)
+					if err != nil {
+						logError("Unable to load guild! " + err.Error())
+					}
+					guildName := "error: could not retrieve"
+					if guild != nil {
+						guildName = guild.Name
+					}
+					dmUser(dg, memberActivity.MemberID, fmt.Sprintf("You have been automatically kicked from **%s** due to %d or more days of inactivity.", guildName, autokickData.DaysUntilKick))
 				}
 			}
-			query.Close()
 		}
+		query.Close()
 
 		time.Sleep(6 * time.Hour)
 	}
