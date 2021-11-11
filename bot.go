@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"os"
 	"os/signal"
@@ -118,6 +119,19 @@ func runBot(token string) {
 
 	logInfo("Starting the application")
 
+	// Playing...
+	statuses := [...]string{
+		"VSCode",
+		"with print statements instead of debugging properly",
+		"video games instead of doing my classwork",
+		"with scissors",
+		"Hentai Killer VR",
+		"with people who unironically use Ripcord",
+		"with unsafe syscalls",
+		"PuTTY",
+		"Human Simulator 2",
+	}
+
 	dbUsername = os.Getenv("DB_USERNAME")
 	dbPassword = os.Getenv("DB_PASSWORD")
 	dbName = os.Getenv("DB")
@@ -210,6 +224,9 @@ func runBot(token string) {
 
 	initCommandInfo()
 
+	// start rotating statuses
+	go rotateStatuses(dg, statuses[:])
+
 	// start auto-kick listener
 	go runAutoKicker(dg)
 
@@ -228,6 +245,21 @@ func runBot(token string) {
 	// Cleanly close down the Discord session and Twitter connection.
 	dg.Close()
 	api.Close()
+}
+
+func rotateStatuses(dg *discordgo.Session, statuses []string) {
+	for {
+		rand.Seed(time.Now().Unix())
+		n := rand.Intn(len(statuses))
+		err := dg.UpdateGameStatus(0, statuses[n])
+		if err != nil {
+			logError("Failed to select a new game status! " + err.Error())
+		} else {
+			logSuccess("Updated game status to: " + statuses[n])
+		}
+
+		time.Sleep(2 * time.Hour)
+	}
 }
 
 func runAutoKicker(dg *discordgo.Session) {
