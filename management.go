@@ -548,6 +548,170 @@ func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start []stri
 }
 
 /**
+Toggles "deafened" state of the specified user.
+**/
+func vcDeaf(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceDeafenMembers) {
+		attemptSendMsg(s, m, "Sorry, you aren't allowed to deafen/undeafen other members.")
+		return
+	}
+
+	if len(command) != 2 {
+		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		return
+	}
+
+	// 1. get user ID
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		return
+	}
+
+	userID := stripUserID(command[1])
+
+	logInfo(strings.Join(command, " "))
+
+	member, err := s.GuildMember(m.GuildID, userID)
+	if err != nil {
+		logError("Could not retrieve user from the session! " + err.Error())
+		attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
+		return
+	}
+
+	// 2. toggle deafened state
+	err = s.GuildMemberDeafen(m.GuildID, userID, !member.Deaf)
+	if err != nil {
+		logError("Failed to toggle deafened state of the user! " + err.Error())
+		attemptSendMsg(s, m, "Failed to toggle deafened state of the user.")
+		return
+	}
+
+	attemptSendMsg(s, m, "Toggled 'deafened' state of the user.")
+}
+
+/**
+Toggles "VC muted" state of the specified user.
+**/
+func vcMute(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceMuteMembers) {
+		attemptSendMsg(s, m, "Sorry, you aren't allowed to mute/unmute other members.")
+		return
+	}
+
+	if len(command) != 2 {
+		attemptSendMsg(s, m, "Usage: `~vcmute @user`")
+		return
+	}
+
+	// 1. get user ID
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		return
+	}
+
+	userID := stripUserID(command[1])
+
+	logInfo(strings.Join(command, " "))
+
+	member, err := s.GuildMember(m.GuildID, userID)
+	if err != nil {
+		logError("Could not retrieve user from the session! " + err.Error())
+		attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
+		return
+	}
+
+	// 2. toggled vc muted state
+	err = s.GuildMemberMute(m.GuildID, userID, !member.Mute)
+	if err != nil {
+		logError("Failed to toggle muted state of the user! " + err.Error())
+		attemptSendMsg(s, m, "Failed to toggle muted state of the user.")
+		return
+	}
+
+	attemptSendMsg(s, m, "Toggled 'muted' state of the user from the channel.")
+}
+
+/**
+Moves the user to the specified voice channel.
+**/
+func vcMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceDeafenMembers) {
+		attemptSendMsg(s, m, "Sorry, you aren't allowed to move other members across voice channels.")
+		return
+	}
+
+	if len(command) != 3 {
+		attemptSendMsg(s, m, "Usage: `~vcmove @user #!<voice channel>`")
+		return
+	}
+
+	// 1. get user ID
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		return
+	}
+
+	userID := stripUserID(command[1])
+
+	logInfo(strings.Join(command, " "))
+
+	// 2. get voice channel
+	if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
+		attemptSendMsg(s, m, "Usage: `~vcmove @user #!<voice channel>`")
+		return
+	}
+	channel := strings.ReplaceAll(command[2], "<#", "")
+	channel = strings.ReplaceAll(channel, ">", "")
+
+	// 3. move user to voice channel
+	err := s.GuildMemberMove(m.GuildID, userID, &channel)
+	if err != nil {
+		logError("Failed to move the user to that channel! " + err.Error())
+		attemptSendMsg(s, m, "Failed to move the user to that channel. Is it a voice channel?")
+		return
+	}
+
+	attemptSendMsg(s, m, "Moved the user.")
+}
+
+/**
+Kicks the specified user from the voice channel they are in, if any.
+**/
+func vcKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceMuteMembers) {
+		attemptSendMsg(s, m, "Sorry, you aren't allowed to mute/unmute other members.")
+		return
+	}
+
+	if len(command) != 2 {
+		attemptSendMsg(s, m, "Usage: `~vckick @user`")
+		return
+	}
+
+	// 1. get user ID
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		attemptSendMsg(s, m, "Usage: `~vckick @user`")
+		return
+	}
+
+	userID := stripUserID(command[1])
+
+	// 2. remove user from voice channel
+	err := s.GuildMemberMove(m.GuildID, userID, nil)
+	if err != nil {
+		logError("Failed to remove the user from that channel! " + err.Error())
+		attemptSendMsg(s, m, "Failed to remove the user from that channel. Is it a voice channel?")
+		return
+	}
+
+	attemptSendMsg(s, m, "Kicked the user from the channel.")
+}
+
+/**
 Forces the bot to exit with code 0. Note that in Heroku the bot will restart automatically.
 **/
 func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
