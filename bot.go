@@ -108,6 +108,10 @@ func initCommandInfo() {
 		"killer":      {handleKiller},
 		"survivor":    {handleSurvivor},
 		"emoji":       {emoji},
+		"vcdeaf":      {vcDeaf},
+		"vcmute":      {vcMute},
+		"vcmove":      {vcMove},
+		"vckick":      {vcKick},
 	}
 }
 
