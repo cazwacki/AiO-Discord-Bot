@@ -181,6 +181,10 @@ desired information in the Killer struct created above.
 func scrapeKiller(killer string) Killer {
 	var resultingKiller Killer
 
+	// special case because there is both a perk and killer named nemesis... why...
+	if strings.Contains(strings.ToLower(killer), "nemesis") {
+		killer = "Nemesis_T-Type"
+	}
 	resultingKiller.PageURL = "https://deadbydaylight.gamepedia.com/" + killer
 
 	// Request the HTML page.
@@ -212,6 +216,7 @@ func scrapeKiller(killer string) Killer {
 	// get short data
 	docData.Find("tr").Each(func(i int, s *goquery.Selection) {
 		attribute := s.Find("td").First().Text()
+		logInfo("Killer Attribute Found: " + attribute)
 		switch attribute {
 		case "Realm":
 			resultingKiller.Realm = s.Find("td").Last().Text()
@@ -219,9 +224,9 @@ func scrapeKiller(killer string) Killer {
 			resultingKiller.Power = s.Find("td").Last().Text()
 		case "Power Attack Type":
 			resultingKiller.PowerAttackType = s.Find("td").Last().Text()
-		case "Movement speed ":
+		case "Movement Speed":
 			resultingKiller.MovementSpeed = s.Find("td").Last().Text()
-		case "Terror Radius ":
+		case "Terror Radius":
 			resultingKiller.TerrorRadius = s.Find("td").Last().Text()
 		case "Height ":
 			resultingKiller.Height = s.Find("td").Last().Text()
@@ -470,7 +475,9 @@ func handleKiller(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	shortdata = append(shortdata, createField("Terror Radius", killer.TerrorRadius, false))
 	shortdata = append(shortdata, createField("Height", killer.Height, false))
 	shortdata = append(shortdata, createField("Power Attack Type", killer.PowerAttackType, false))
-	shortdata = append(shortdata, createField("Realm", killer.Realm, false))
+	if killer.Realm != "" {
+		shortdata = append(shortdata, createField("Realm", killer.Realm, false))
+	}
 	perkText := ""
 	for i := 0; i < 3; i++ {
 		perkText += fmt.Sprintf("[%s](%s)\n", strings.TrimSpace(killer.Perks[i]), strings.TrimSpace(killer.PerkURLs[i]))
