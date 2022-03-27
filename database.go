@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
+	"github.com/dghubble/go-twitter/twitter"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -804,7 +804,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			}
 
 			if !autokickEnabled {
-				attemptSendMsg(s, m, fmt.Sprintf("Autokick is currently disabled for the server."))
+				attemptSendMsg(s, m, "Autokick is currently disabled for the server.")
 			}
 			logSuccess("Returned autokick info")
 			return
@@ -899,44 +899,44 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 When a new shrine tweet is received, construct a message and post it to the designated
 autoshrine channel.
 */
-func handleTweet(s *discordgo.Session, v anaconda.Tweet) {
-	if strings.HasPrefix(v.Text, "This week's shrine is") && v.User.Id == 4850837842 {
-		query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s", autoshrineTable))
+func handleTweet(s *discordgo.Session, v twitter.Tweet) {
+	logInfo("Handling a tweet")
+	query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s", autoshrineTable))
+	if err != nil {
+		logError("SELECT query error, so stopping execution: " + err.Error())
+		return
+	}
+	defer query.Close()
+
+	for query.Next() {
+		// write and send embed
+		var autoshrineData ModLogData
+		err = query.Scan(&autoshrineData.GuildID, &autoshrineData.ChannelID)
 		if err != nil {
-			logError("SELECT query error, so stopping execution: " + err.Error())
+			logError("Unable to parse database information! Aborting. " + err.Error())
 			return
 		}
-		defer query.Close()
+		logInfo("Sending shrine data to " + autoshrineData.GuildID + " " + autoshrineData.ChannelID)
 
-		for query.Next() {
-			// write and send embed
-			var autoshrineData ModLogData
-			err = query.Scan(&autoshrineData.GuildID, &autoshrineData.ChannelID)
-			if err != nil {
-				logError("Unable to parse database information! Aborting. " + err.Error())
-				return
-			}
+		// construct embed response
+		var embed discordgo.MessageEmbed
+		splitText := strings.Split(strings.ReplaceAll(v.Text, "&amp;", "&"), " ")
+		embed.URL = splitText[len(splitText)-1]
+		embed.Type = "rich"
+		embed.Title = "Latest Shrine (@DeadbyBHVR)"
+		embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
+		var image discordgo.MessageEmbedImage
+		image.URL = v.Entities.Media[0].MediaURL
+		embed.Image = &image
+		var thumbnail discordgo.MessageEmbedThumbnail
+		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
+		embed.Thumbnail = &thumbnail
 
-			// construct embed response
-			var embed discordgo.MessageEmbed
-			splitText := strings.Split(strings.ReplaceAll(v.FullText, "&amp;", "&"), " ")
-			embed.URL = splitText[len(splitText)-1]
-			embed.Type = "rich"
-			embed.Title = "Latest Shrine (@DeadbyBHVR)"
-			embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
-			var image discordgo.MessageEmbedImage
-			image.URL = v.Entities.Media[0].Media_url
-			embed.Image = &image
-			var thumbnail discordgo.MessageEmbedThumbnail
-			thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
-			embed.Thumbnail = &thumbnail
-
-			// send response
-			_, err = s.ChannelMessageSendEmbed(autoshrineData.ChannelID, &embed)
-			if err != nil {
-				logError("Failed to send tweet embed! " + err.Error())
-				return
-			}
+		// send response
+		_, err = s.ChannelMessageSendEmbed(autoshrineData.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send tweet embed! " + err.Error())
+			return
 		}
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"os"
 	"os/signal"
 	"regexp"
@@ -13,8 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ChimeraCoder/anaconda"
 	"github.com/bwmarrin/discordgo"
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
 )
 
 var start time.Time
@@ -235,10 +235,18 @@ func runBot(token string) {
 	go runAutoKicker(dg)
 
 	/** Open Connection to Twitter **/
-	anaconda.SetConsumerKey(os.Getenv("TWITTER_API_KEY"))
-	anaconda.SetConsumerSecret(os.Getenv("TWITTER_API_SECRET"))
-	api := anaconda.NewTwitterApi(os.Getenv("TWITTER_TOKEN"), os.Getenv("TWITTER_TOKEN_SECRET"))
-	go runTwitterLoop(api, dg)
+	config := oauth1.NewConfig(os.Getenv("TWITTER_API_KEY"), os.Getenv("TWITTER_API_SECRET"))
+	twitter_token := oauth1.NewToken(os.Getenv("TWITTER_TOKEN"), os.Getenv("TWITTER_TOKEN_SECRET"))
+	httpClient := config.Client(oauth1.NoContext, twitter_token)
+	client := twitter.NewClient(httpClient)
+
+	_, resp, err := client.Statuses.Update("just setting up my twttr", nil)
+	fmt.Println(resp)
+	if err != nil {
+		logError("Failure lol: " + err.Error())
+	}
+
+	go runTwitterLoop(client, dg)
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -246,9 +254,8 @@ func runBot(token string) {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
-	// Cleanly close down the Discord session and Twitter connection.
+	// Cleanly close down the Discord session
 	dg.Close()
-	api.Close()
 }
 
 func rotateStatuses(dg *discordgo.Session, statuses []string) {
@@ -335,17 +342,23 @@ func runAutoKicker(dg *discordgo.Session) {
 Opens a stream looking for new tweets from @DeadbyBHVR, who posts the weekly
 shrine on Twitter.
 */
-func runTwitterLoop(api *anaconda.TwitterApi, dg *discordgo.Session) {
-	logInfo("Listening to Twitter")
-	v := url.Values{}
-	v.Set("follow", "4850837842") // @DeadbyBHVR is 4850837842
-	v.Set("track", "shrine")
-	s := api.PublicStreamFilter(v)
-	for t := range s.C {
-		switch v := t.(type) {
-		case anaconda.Tweet:
-			handleTweet(dg, v)
-		}
+func runTwitterLoop(client *twitter.Client, dg *discordgo.Session) {
+	params := &twitter.StreamFilterParams{
+		Track:  []string{"This week's shrine is"},
+		Follow: []string{"4850837842"},
+	}
+	stream, err := client.Streams.Filter(params)
+	if err != nil {
+		logError("Failed to create the Twitter stream! " + err.Error())
+		return
+	}
+
+	demux := twitter.NewSwitchDemux()
+	demux.Tweet = func(tweet *twitter.Tweet) { handleTweet(dg, *tweet) }
+
+	logInfo("Listening for tweets")
+	for message := range stream.Messages {
+		demux.Handle(message)
 	}
 }
 
