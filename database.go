@@ -901,6 +901,10 @@ autoshrine channel.
 */
 func handleTweet(s *discordgo.Session, v twitter.Tweet) {
 	logInfo("Handling a tweet")
+	if v.User.ID != 4850837842 {
+		logInfo("Tweet not from DeadByBHVR. Skipping...")
+		return
+	}
 	query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s", autoshrineTable))
 	if err != nil {
 		logError("SELECT query error, so stopping execution: " + err.Error())
@@ -926,7 +930,9 @@ func handleTweet(s *discordgo.Session, v twitter.Tweet) {
 		embed.Title = "Latest Shrine (@DeadbyBHVR)"
 		embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
 		var image discordgo.MessageEmbedImage
-		image.URL = v.Entities.Media[0].MediaURL
+		if len(v.Entities.Media) > 0 {
+			image.URL = v.Entities.Media[0].MediaURL
+		}
 		embed.Image = &image
 		var thumbnail discordgo.MessageEmbedThumbnail
 		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
