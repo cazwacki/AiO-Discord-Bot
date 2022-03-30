@@ -901,8 +901,8 @@ autoshrine channel.
 */
 func handleTweet(s *discordgo.Session, v twitter.Tweet) {
 	logInfo("Handling a tweet")
-	if v.User.ID != 4850837842 {
-		logInfo("Tweet not from DeadByBHVR. Skipping...")
+	if v.User.ID != 4850837842 && !strings.HasPrefix(v.FullText, "This week's shrine is") {
+		logInfo("Tweet not a shrine from DeadByBHVR. Skipping...")
 		return
 	}
 	query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s", autoshrineTable))

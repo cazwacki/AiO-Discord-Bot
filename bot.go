@@ -344,7 +344,6 @@ shrine on Twitter.
 */
 func runTwitterLoop(client *twitter.Client, dg *discordgo.Session) {
 	params := &twitter.StreamFilterParams{
-		Track:  []string{"This week's shrine is"},
 		Follow: []string{"4850837842"},
 	}
 	stream, err := client.Streams.Filter(params)
