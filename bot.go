@@ -29,6 +29,7 @@ type handler func(*discordgo.Session, *discordgo.MessageCreate, []string)
 
 type command struct {
 	handle handler
+	usage  string
 }
 
 func appendToGlobalImageSet(s *discordgo.Session, newset ImageSet) {
@@ -79,39 +80,39 @@ Initialize command information and prefix
 func initCommandInfo() {
 	prefix = "~"
 	commandList = map[string]command{
-		"uptime":      {handleUptime},
-		"shutdown":    {handleShutdown},
-		"invite":      {handleInvite},
-		"profile":     {attemptProfile},
-		"nick":        {handleNickname},
-		"kick":        {handleKick},
-		"ban":         {handleBan},
-		"mv":          {handleMove},
-		"cp":          {handleCopy},
-		"purge":       {handlePurge},
-		"define":      {handleDefine},
-		"urban":       {handleUrban},
-		"google":      {handleGoogle},
-		"image":       {handleImage},
-		"convert":     {handleConvert},
-		"perk":        {handlePerk},
-		"shrine":      {handleShrine},
-		"autoshrine":  {handleAutoshrine},
-		"help":        {handleHelp},
-		"wiki":        {handleWiki},
-		"about":       {attemptAbout},
-		"activity":    {activity},
-		"leaderboard": {leaderboard},
-		"greeter":     {greeter},
-		"modlog":      {setModLogChannel},
-		"addon":       {handleAddon},
-		"killer":      {handleKiller},
-		"survivor":    {handleSurvivor},
-		"emoji":       {emoji},
-		"vcdeaf":      {vcDeaf},
-		"vcmute":      {vcMute},
-		"vcmove":      {vcMove},
-		"vckick":      {vcKick},
+		"uptime":      {handleUptime, "~uptime"},
+		"shutdown":    {handleShutdown, "~shutdown"},
+		"invite":      {handleInvite, "~invite"},
+		"profile":     {attemptProfile, "~profile"},
+		"nick":        {handleNickname, "~nick @user (reason: optional)"},
+		"kick":        {handleKick, "~kick @user (reason: optional)"},
+		"ban":         {handleBan, "~ban @user (reason: optional)"},
+		"mv":          {handleMove, "~mv <number> #channel"},
+		"cp":          {handleCopy, "~cp <number> #channel"},
+		"purge":       {handlePurge, "~purge <number>"},
+		"define":      {handleDefine, "~define <word / phrase>"},
+		"urban":       {handleUrban, "~urban <word / phrase>"},
+		"google":      {handleGoogle, "~google <word / phrase>"},
+		"image":       {handleImage, "~image <word / phrase>"},
+		"convert":     {handleConvert, "~convert <time> <IANA timezone>\nhttps://en.wikipedia.org/wiki/List_of_tz_database_time_zones"},
+		"perk":        {handlePerk, "~perk <perk name>"},
+		"shrine":      {handleShrine, "~shrine"},
+		"autoshrine":  {handleAutoshrine, "~autoshrine set #channel / ~autoshrine reset"},
+		"help":        {handleHelp, "~help"},
+		"wiki":        {handleWiki, "~wiki <word / phrase>"},
+		"about":       {attemptAbout, "~about @user"},
+		"activity":    {activity, "~activity help"},
+		"leaderboard": {leaderboard, "~leaderboard"},
+		"greeter":     {greeter, "~greeter help"},
+		"modlog":      {setModLogChannel, "~modlog set #channel / ~modlog reset"},
+		"addon":       {handleAddon, "~addon <addon name>"},
+		"killer":      {handleKiller, "~killer <killer name>"},
+		"survivor":    {handleSurvivor, "~survivor <survivor name>"},
+		"emoji":       {emoji, "~emoji"},
+		"vcdeaf":      {vcDeaf, "~vcdeaf @user"},
+		"vcmute":      {vcMute, "~vcmute @user"},
+		"vcmove":      {vcMove, "~vcmove @user #!channel"},
+		"vckick":      {vcKick, "~vckick @user"},
 	}
 }
 
@@ -240,12 +241,6 @@ func runBot(token string) {
 	httpClient := config.Client(oauth1.NoContext, twitter_token)
 	client := twitter.NewClient(httpClient)
 
-	_, resp, err := client.Statuses.Update("just setting up my twttr", nil)
-	fmt.Println(resp)
-	if err != nil {
-		logError("Failure lol: " + err.Error())
-	}
-
 	go runTwitterLoop(client, dg)
 
 	// Wait here until CTRL-C or other term signal is received.
@@ -292,7 +287,7 @@ func runAutoKicker(dg *discordgo.Session) {
 			}
 
 			// 2. get all users from member activity table that are not whitelisted and are in the given guild
-			memberQuery, err := connection_pool.Query("SELECT * FROM ? WHERE (guild_id = '?' AND whitelist = false);", activityTable, autokickData.GuildID)
+			memberQuery, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ? AND whitelist = false);", activityTable), autokickData.GuildID)
 			if err != nil {
 				logError("SELECT query error: " + err.Error())
 				return

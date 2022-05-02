@@ -10,6 +10,17 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+type ErrorType int32
+
+const (
+	Syntax      ErrorType = 0
+	Database    ErrorType = 1
+	Discord     ErrorType = 2
+	ReadParse   ErrorType = 3
+	Permissions ErrorType = 4
+	Internal    ErrorType = 5
+)
+
 /**
 Prints an info log to the console if debug mode is on.
 */
@@ -116,4 +127,35 @@ func attemptSendMsg(s *discordgo.Session, m *discordgo.MessageCreate, message st
 		logError("Failed to send message with contents: " + message + "\n" + err.Error())
 		return
 	}
+}
+
+/**
+Send a message, and ignore errors. This is useful to print error messages.
+*/
+func sendError(s *discordgo.Session, m *discordgo.MessageCreate, command string, errorType ErrorType) {
+	// add x reaction to message
+	err := s.MessageReactionAdd(m.ChannelID, m.ID, "❌")
+	if err != nil {
+		logError("Failed to react to erroring command; " + err.Error())
+	}
+
+	// generic error message
+	var messageContent string
+	switch errorType {
+	case Syntax:
+		messageContent = fmt.Sprintf("Usage: `%s`", commandList[command].usage)
+	case Database:
+		messageContent = ":bangbang: A database error occurred."
+	case Discord:
+		messageContent = ":bangbang: Discord was unable to handle the request."
+	case ReadParse:
+		messageContent = ":bangbang: Failed to grab the necessary data."
+	case Permissions:
+		messageContent = ":bangbang: You do not have the permissions to use this command."
+	case Internal:
+		messageContent = ":bangbang: An internal error occurred."
+	default:
+		messageContent = ":bangbang: An error occurred."
+	}
+	attemptSendMsg(s, m, messageContent)
 }

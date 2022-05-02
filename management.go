@@ -21,7 +21,7 @@ If the user has administrator permissions, just automatically allow them to perf
 func userHasValidPermissions(s *discordgo.Session, m *discordgo.MessageCreate, permission int64) bool {
 	perms, err := s.UserChannelPermissions(m.Author.ID, m.ChannelID)
 	if err != nil {
-		attemptSendMsg(s, m, "Error occurred while validating your permissions.")
+		sendError(s, m, "", Discord)
 		logError("Failed to acquire user permissions! " + err.Error())
 		return false
 	}
@@ -46,31 +46,6 @@ func dmUser(s *discordgo.Session, userID string, message string) {
 		logError("Failed to send message! " + err.Error())
 		return
 	}
-	logSuccess("Sent DM to user")
-}
-
-/**
-A helper function for Handle_nick. Ensures the user targeted a user using @; if they did,
-attempt to rename the specified user.
-**/
-func attemptRename(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	logInfo(strings.Join(command, " "))
-	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-	if regex.MatchString(command[1]) && len(command) > 2 {
-		userID := stripUserID(command[1])
-		err := s.GuildMemberNickname(m.GuildID, userID, strings.Join(command[2:], " "))
-		if err == nil {
-			attemptSendMsg(s, m, "Done!")
-			logSuccess("Successfully renamed user")
-		} else {
-			attemptSendMsg(s, m, fmt.Sprintf("Failed to set nickname.\n```%s```", err.Error()))
-			logError("Failed to set nickname! " + err.Error())
-			return
-		}
-		return
-	}
-
-	attemptSendMsg(s, m, "Usage: `~nick @<user> <new name>`")
 }
 
 /**
@@ -79,58 +54,61 @@ attempt to kick the specified user.
 **/
 func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
+
+	if len(command) < 2 {
+		sendError(s, m, "kick", Syntax)
+		return
+	}
+
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-	if len(command) >= 2 {
-		if regex.MatchString(command[1]) {
-			userID := stripUserID(command[1])
-			if len(command) > 2 {
-				reason := strings.Join(command[2:], " ")
-				// dm user why they were kicked
-				guild, err := s.Guild(m.GuildID)
-				if err != nil {
-					logError("Unable to load guild! " + err.Error())
-				}
-				guildName := "error: could not retrieve"
-				if guild != nil {
-					guildName = guild.Name
-				}
-				dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+	if !regex.MatchString(command[1]) {
+		sendError(s, m, "kick", Syntax)
+		return
+	}
 
-				// kick with reason
-				err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
-				if err != nil {
-					attemptSendMsg(s, m, "Failed to kick the user.")
-					logError("Failed to kick user! " + err.Error())
-					return
-				}
+	userID := stripUserID(command[1])
+	if len(command) > 2 {
+		reason := strings.Join(command[2:], " ")
+		// dm user why they were kicked
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
 
-				attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s for the following reason: '%s'.", command[1], reason))
-				logSuccess("Kicked user with reason")
-			} else {
-				// dm user they were kicked
-				guild, err := s.Guild(m.GuildID)
-				if err != nil {
-					logError("Unable to load guild! " + err.Error())
-				}
-				guildName := "error: could not retrieve"
-				if guild != nil {
-					guildName = guild.Name
-				}
-				dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
-				// kick without reason
-				err = s.GuildMemberDelete(m.GuildID, userID)
-				if err != nil {
-					attemptSendMsg(s, m, "Failed to kick the user.")
-					logError("Failed to kick user! " + err.Error())
-					return
-				}
-				attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s.", command[1]))
-				logSuccess("Kicked user")
-			}
+		// kick with reason
+		err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
+		if err != nil {
+			logError("Failed to kick user! " + err.Error())
+			sendError(s, m, "kick", Discord)
 			return
 		}
+
+		attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s for the following reason: '%s'.", command[1], reason))
+	} else {
+		// dm user they were kicked
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
+		// kick without reason
+		err = s.GuildMemberDelete(m.GuildID, userID)
+		if err != nil {
+			logError("Failed to kick user! " + err.Error())
+			sendError(s, m, "kick", Discord)
+			return
+		}
+		attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s.", command[1]))
 	}
-	attemptSendMsg(s, m, "Usage: `~kick @<user> (reason: optional)`")
 }
 
 /**
@@ -139,63 +117,63 @@ attempt to ban the specified user.
 **/
 func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
+
+	if len(command) < 2 {
+		sendError(s, m, "ban", Syntax)
+		return
+	}
+
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-	if len(command) >= 2 {
-		if regex.MatchString(command[1]) {
-			userID := stripUserID(command[1])
-			if len(command) > 2 {
-				reason := strings.Join(command[2:], " ")
+	if regex.MatchString(command[1]) {
+		sendError(s, m, "ban", Syntax)
+		return
+	}
 
-				// dm user why they were banned
-				guild, err := s.Guild(m.GuildID)
-				if err != nil {
-					logError("Unable to load guild! " + err.Error())
-				}
-				guildName := "error: could not retrieve"
-				if guild != nil {
-					guildName = guild.Name
-				}
-				dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+	userID := stripUserID(command[1])
+	if len(command) > 2 {
+		reason := strings.Join(command[2:], " ")
 
-				// ban with reason
-				err = s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
-				if err != nil {
-					attemptSendMsg(s, m, "Failed to ban the user.")
-					logError("Failed to ban user! " + err.Error())
-					if err != nil {
-						logWarning("Failed to send failure message! " + err.Error())
-					}
-					return
-				}
+		// dm user why they were banned
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
 
-				attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s for the following reason: '%s'.", command[1], reason))
-				logSuccess("Banned user with reason without issue")
-			} else {
-				// ban without reason
-				err := s.GuildBanCreate(m.GuildID, userID, 0)
-				if err != nil {
-					attemptSendMsg(s, m, "Failed to ban the user.")
-					logError("Failed to ban user! " + err.Error())
-					return
-				}
-				// dm user they were banned
-				guild, err := s.Guild(m.GuildID)
-				if err != nil {
-					logError("Unable to load guild! " + err.Error())
-				}
-				guildName := "error: could not retrieve"
-				if guild != nil {
-					guildName = guild.Name
-				}
-				dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
-
-				attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s.", command[1]))
-				logSuccess("Banned user with reason without issue")
-			}
+		// ban with reason
+		err = s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
+		if err != nil {
+			logError("Failed to ban user! " + err.Error())
+			sendError(s, m, "ban", Discord)
 			return
 		}
+
+		attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s for the following reason: '%s'.", command[1], reason))
+	} else {
+		// ban without reason
+		err := s.GuildBanCreate(m.GuildID, userID, 0)
+		if err != nil {
+			logError("Failed to ban user! " + err.Error())
+			sendError(s, m, "ban", Discord)
+			return
+		}
+		// dm user they were banned
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
+
+		attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s.", command[1]))
 	}
-	attemptSendMsg(s, m, "Usage: `~ban @<user> (reason: optional)`")
 }
 
 /**
@@ -203,61 +181,64 @@ Attempts to purge the last <number> messages, then removes the purge command.
 */
 func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
-	if len(command) == 2 {
-		messageCount, err := strconv.Atoi(command[1])
+
+	if len(command) != 2 {
+		sendError(s, m, "purge", Syntax)
+		return
+	}
+
+	messageCount, err := strconv.Atoi(command[1])
+	if err != nil {
+		sendError(s, m, "purge", Syntax)
+		return
+	}
+
+	if messageCount < 1 {
+		attemptSendMsg(s, m, ":frowning: Sorry, you must purge at least 1 message. Try again.")
+		logWarning("User attempted to purge < 1 message.")
+		return
+	}
+
+	for messageCount > 0 {
+		messagesToPurge := 0
+		// can only purge 100 messages per invocation
+		if messageCount > 100 {
+			messagesToPurge = 100
+		} else {
+			messagesToPurge = messageCount
+		}
+
+		// get the last (messagesToPurge) messages from the channel
+		messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
 		if err != nil {
-			attemptSendMsg(s, m, "Usage: `~purge <number> (optional: @user)`")
+			attemptSendMsg(s, m, ":frowning: I couldn't pull messages from the channel. Try again.")
+			logError("Failed to pull messages from channel! " + err.Error())
 			return
 		}
-		if messageCount < 1 {
-			attemptSendMsg(s, m, ":frowning: Sorry, you must purge at least 1 message. Try again.")
-			logWarning("User attempted to purge < 1 message.")
-			return
+
+		// stop purging if there is nothing left to purge
+		if len(messages) < messagesToPurge {
+			messageCount = 0
 		}
-		for messageCount > 0 {
-			messagesToPurge := 0
-			// can only purge 100 messages per invocation
-			if messageCount > 100 {
-				messagesToPurge = 100
-			} else {
-				messagesToPurge = messageCount
-			}
 
-			// get the last (messagesToPurge) messages from the channel
-			messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
-			if err != nil {
-				attemptSendMsg(s, m, ":frowning: I couldn't pull messages from the channel. Try again.")
-				logError("Failed to pull messages from channel! " + err.Error())
-				return
-			}
-
-			// stop purging if there is nothing left to purge
-			if len(messages) < messagesToPurge {
-				messageCount = 0
-			}
-
-			// get the message IDs
-			var messageIDs []string
-			for _, message := range messages {
-				messageIDs = append(messageIDs, message.ID)
-			}
-
-			// delete all the marked messages
-			err = s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
-			if err != nil {
-				logWarning("Failed to bulk delete messages! Attempting to continue... " + err.Error())
-			}
-			messageCount -= messagesToPurge
+		// get the message IDs
+		var messageIDs []string
+		for _, message := range messages {
+			messageIDs = append(messageIDs, message.ID)
 		}
-		time.Sleep(time.Second)
-		err = s.ChannelMessageDelete(m.ChannelID, m.ID)
+
+		// delete all the marked messages
+		err = s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
 		if err != nil {
-			logError("Failed to delete invoked command! " + err.Error())
-			return
+			logWarning("Failed to bulk delete messages! Attempting to continue... " + err.Error())
 		}
-		logSuccess("Purged all messages, including command invoked")
-	} else {
-		attemptSendMsg(s, m, "Usage: `~purge <number>`")
+		messageCount -= messagesToPurge
+	}
+	time.Sleep(time.Second)
+	err = s.ChannelMessageDelete(m.ChannelID, m.ID)
+	if err != nil {
+		logError("Failed to delete invoked command! " + err.Error())
+		return
 	}
 }
 
@@ -274,28 +255,29 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	}
 
 	if len(command) != 3 {
-		attemptSendMsg(s, m, fmt.Sprintf("Usage: `~%s <number <= 100> <#channel>`", commandInvoked))
+		sendError(s, m, commandInvoked, Syntax)
 		return
 	}
 
 	messageCount, err := strconv.Atoi(command[1])
 	if err != nil {
-		attemptSendMsg(s, m, "Failed to read the message count.")
+		sendError(s, m, commandInvoked, Syntax)
 		return
 	}
 
 	// verify correctly invoking channel
 	if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
-		attemptSendMsg(s, m, fmt.Sprintf("Usage: `~%s <number <= 100> <#channel>`", commandInvoked))
+		sendError(s, m, commandInvoked, Syntax)
 		return
 	}
+
 	channel := strings.ReplaceAll(command[2], "<#", "")
 	channel = strings.ReplaceAll(channel, ">", "")
 
 	// retrieve messages from current invoked channel
 	messages, err := s.ChannelMessages(m.ChannelID, messageCount, m.ID, "", "")
 	if err != nil {
-		attemptSendMsg(s, m, "Ran into an error retrieving messages. :slight_frown:")
+		sendError(s, m, commandInvoked, Discord)
 		return
 	}
 
@@ -394,12 +376,8 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			return
 		}
 	}
-	_, err = s.ChannelMessageSend(m.ChannelID, "Copied "+strconv.Itoa(messageCount)+" messages from <#"+m.ChannelID+"> to <#"+channel+">! :smile:")
-	if err != nil {
-		logError("Failed to send success message! " + err.Error())
-		return
-	}
-	logSuccess("Copied messages and sent success message")
+
+	attemptSendMsg(s, m, fmt.Sprintf("Copied %d messages from <#%s> to <#%s>! :smile:", messageCount, m.ChannelID, channel))
 }
 
 /**
@@ -408,129 +386,137 @@ in an embed.
 */
 func attemptProfile(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
-	if len(command) == 2 {
-		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-		if regex.MatchString(command[1]) {
-			userID := strings.TrimSuffix(command[1], ">")
-			userID = strings.TrimPrefix(userID, "<@")
-			userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
-			var embed discordgo.MessageEmbed
-			embed.Type = "rich"
 
-			// get user
-			user, err := s.User(userID)
-			if err != nil {
-				attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
-				logError("Could not retrieve user from session! " + err.Error())
-				return
-			}
-
-			// get member data from the user
-			member, err := s.GuildMember(m.GuildID, userID)
-			nickname := ""
-			if err == nil {
-				nickname = member.Nick
-			} else {
-				fmt.Println(err)
-			}
-
-			// title the embed
-			embed.Title = "Profile Picture for "
-			if nickname != "" {
-				embed.Title += nickname + " ("
-			}
-			embed.Title += user.Username + "#" + user.Discriminator
-			if nickname != "" {
-				embed.Title += ")"
-			}
-
-			// attach the user's avatar as 512x512 image
-			var image discordgo.MessageEmbedImage
-			image.URL = user.AvatarURL("512")
-			embed.Image = &image
-
-			_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-			if err != nil {
-				logError("Failed to send result message! " + err.Error())
-				return
-			}
-			logSuccess("Returned user profile picture")
-			return
-		}
+	if len(command) != 2 {
+		sendError(s, m, "profile", Syntax)
+		return
 	}
-	attemptSendMsg(s, m, "Usage: `~profile @user`")
+
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		sendError(s, m, "profile", Syntax)
+		return
+	}
+
+	userID := strings.TrimSuffix(command[1], ">")
+	userID = strings.TrimPrefix(userID, "<@")
+	userID = strings.TrimPrefix(userID, "!") // this means the user has a nickname
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+
+	// get user
+	user, err := s.User(userID)
+	if err != nil {
+		logError("Could not retrieve user from session! " + err.Error())
+		sendError(s, m, "profile", Discord)
+		return
+	}
+
+	// get member data from the user
+	member, err := s.GuildMember(m.GuildID, userID)
+	nickname := ""
+	if err == nil {
+		nickname = member.Nick
+	} else {
+		fmt.Println(err)
+	}
+
+	// title the embed
+	embed.Title = "Profile Picture for "
+	if nickname != "" {
+		embed.Title += nickname + " ("
+	}
+	embed.Title += user.Username + "#" + user.Discriminator
+	if nickname != "" {
+		embed.Title += ")"
+	}
+
+	// attach the user's avatar as 512x512 image
+	var image discordgo.MessageEmbedImage
+	image.URL = user.AvatarURL("512")
+	embed.Image = &image
+
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Failed to send result message! " + err.Error())
+		return
+	}
 }
 
 func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
-	if len(command) == 2 {
-		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-		if regex.MatchString(command[1]) {
-			userID := stripUserID(command[1])
 
-			logInfo(strings.Join(command, " "))
+	if len(command) != 2 {
+		sendError(s, m, "about", Syntax)
+		return
+	}
 
-			member, err := s.GuildMember(m.GuildID, userID)
-			if err != nil {
-				logError("Could not retrieve user from the session! " + err.Error())
-				attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
-				return
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		sendError(s, m, "about", Syntax)
+		return
+	}
+
+	userID := stripUserID(command[1])
+
+	logInfo(strings.Join(command, " "))
+
+	member, err := s.GuildMember(m.GuildID, userID)
+	if err != nil {
+		logError("Could not retrieve user from the session! " + err.Error())
+		sendError(s, m, "about", Discord)
+		return
+	}
+
+	var embed discordgo.MessageEmbed
+	embed.Type = "rich"
+
+	// title the embed
+	embed.Title = "About " + member.User.Username + "#" + member.User.Discriminator
+
+	var contents []*discordgo.MessageEmbedField
+
+	joinDate, err := member.JoinedAt.Parse()
+	if err != nil {
+		logError("Failed to parse Discord dates! " + err.Error())
+		sendError(s, m, "about", Internal)
+		return
+	}
+
+	nickname := "N/A"
+	if member.Nick != "" {
+		nickname = member.Nick
+	}
+
+	contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
+	contents = append(contents, createField("Nickname", nickname, false))
+
+	// get user's roles in readable form
+	guildRoles, err := s.GuildRoles(m.GuildID)
+	if err != nil {
+		logError("Failed to retrieve guild roles! " + err.Error())
+		sendError(s, m, "about", Discord)
+		return
+	}
+	var rolesAttached []string
+
+	for _, role := range guildRoles {
+		for _, roleID := range member.Roles {
+			if role.ID == roleID {
+				rolesAttached = append(rolesAttached, role.Name)
 			}
-
-			var embed discordgo.MessageEmbed
-			embed.Type = "rich"
-
-			// title the embed
-			embed.Title = "About " + member.User.Username + "#" + member.User.Discriminator
-
-			var contents []*discordgo.MessageEmbedField
-
-			joinDate, err := member.JoinedAt.Parse()
-			if err != nil {
-				logError("Failed to parse Discord dates! " + err.Error())
-				attemptSendMsg(s, m, "Error parsing Discord's dates. :frowning:")
-				return
-			}
-
-			nickname := "N/A"
-			if member.Nick != "" {
-				nickname = member.Nick
-			}
-
-			contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
-			contents = append(contents, createField("Nickname", nickname, false))
-
-			// get user's roles in readable form
-			guildRoles, err := s.GuildRoles(m.GuildID)
-			if err != nil {
-				logError("Failed to retrieve guild roles! " + err.Error())
-				attemptSendMsg(s, m, "Error retrieving the guild's roles. :frowning:")
-				return
-			}
-			var rolesAttached []string
-
-			for _, role := range guildRoles {
-				for _, roleID := range member.Roles {
-					if role.ID == roleID {
-						rolesAttached = append(rolesAttached, role.Name)
-					}
-				}
-			}
-			contents = append(contents, createField("Roles", strings.Join(rolesAttached, ", "), false))
-
-			embed.Fields = contents
-
-			// send response
-			_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
-			if err != nil {
-				logError("Couldn't send the message... " + err.Error())
-				return
-			}
-			logSuccess("Returned user information")
-			return
 		}
 	}
-	attemptSendMsg(s, m, "Usage: `~about @user`")
+	contents = append(contents, createField("Roles", strings.Join(rolesAttached, ", "), false))
+
+	embed.Fields = contents
+
+	// send response
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	if err != nil {
+		logError("Couldn't send the message... " + err.Error())
+		return
+	}
 }
 
 /**
@@ -551,31 +537,31 @@ func handleUptime(s *discordgo.Session, m *discordgo.MessageCreate, start []stri
 Toggles "deafened" state of the specified user.
 **/
 func vcDeaf(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
+	logInfo(strings.Join(command, " "))
+
 	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceDeafenMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to deafen/undeafen other members.")
+		sendError(s, m, "vcdeaf", Permissions)
 		return
 	}
 
 	if len(command) != 2 {
-		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		sendError(s, m, "vcdeaf", Syntax)
 		return
 	}
 
 	// 1. get user ID
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if !regex.MatchString(command[1]) {
-		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		sendError(s, m, "vcdeaf", Syntax)
 		return
 	}
 
 	userID := stripUserID(command[1])
 
-	logInfo(strings.Join(command, " "))
-
 	member, err := s.GuildMember(m.GuildID, userID)
 	if err != nil {
 		logError("Could not retrieve user from the session! " + err.Error())
-		attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
+		sendError(s, m, "vcdeaf", Discord)
 		return
 	}
 
@@ -583,7 +569,7 @@ func vcDeaf(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 	err = s.GuildMemberDeafen(m.GuildID, userID, !member.Deaf)
 	if err != nil {
 		logError("Failed to toggle deafened state of the user! " + err.Error())
-		attemptSendMsg(s, m, "Failed to toggle deafened state of the user.")
+		sendError(s, m, "vcdeaf", Discord)
 		return
 	}
 
@@ -595,19 +581,19 @@ Toggles "VC muted" state of the specified user.
 **/
 func vcMute(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceMuteMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to mute/unmute other members.")
+		sendError(s, m, "vcmute", Permissions)
 		return
 	}
 
 	if len(command) != 2 {
-		attemptSendMsg(s, m, "Usage: `~vcmute @user`")
+		sendError(s, m, "vcmute", Syntax)
 		return
 	}
 
 	// 1. get user ID
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if !regex.MatchString(command[1]) {
-		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		sendError(s, m, "vcmute", Syntax)
 		return
 	}
 
@@ -618,7 +604,7 @@ func vcMute(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 	member, err := s.GuildMember(m.GuildID, userID)
 	if err != nil {
 		logError("Could not retrieve user from the session! " + err.Error())
-		attemptSendMsg(s, m, "Error retrieving the user. :frowning:")
+		sendError(s, m, "vcmute", Discord)
 		return
 	}
 
@@ -626,7 +612,7 @@ func vcMute(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 	err = s.GuildMemberMute(m.GuildID, userID, !member.Mute)
 	if err != nil {
 		logError("Failed to toggle muted state of the user! " + err.Error())
-		attemptSendMsg(s, m, "Failed to toggle muted state of the user.")
+		sendError(s, m, "vcmute", Discord)
 		return
 	}
 
@@ -638,19 +624,19 @@ Moves the user to the specified voice channel.
 **/
 func vcMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceDeafenMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to move other members across voice channels.")
+		sendError(s, m, "vcmove", Permissions)
 		return
 	}
 
 	if len(command) != 3 {
-		attemptSendMsg(s, m, "Usage: `~vcmove @user #!<voice channel>`")
+		sendError(s, m, "vcmove", Syntax)
 		return
 	}
 
 	// 1. get user ID
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if !regex.MatchString(command[1]) {
-		attemptSendMsg(s, m, "Usage: `~vcdeaf @user`")
+		sendError(s, m, "vcmove", Syntax)
 		return
 	}
 
@@ -660,7 +646,7 @@ func vcMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 
 	// 2. get voice channel
 	if !strings.HasPrefix(command[2], "<#") || !strings.HasSuffix(command[2], ">") {
-		attemptSendMsg(s, m, "Usage: `~vcmove @user #!<voice channel>`")
+		sendError(s, m, "vcmove", Syntax)
 		return
 	}
 	channel := strings.ReplaceAll(command[2], "<#", "")
@@ -670,7 +656,7 @@ func vcMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 	err := s.GuildMemberMove(m.GuildID, userID, &channel)
 	if err != nil {
 		logError("Failed to move the user to that channel! " + err.Error())
-		attemptSendMsg(s, m, "Failed to move the user to that channel. Is it a voice channel?")
+		sendError(s, m, "vcmove", Discord)
 		return
 	}
 
@@ -682,19 +668,19 @@ Kicks the specified user from the voice channel they are in, if any.
 **/
 func vcKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionVoiceMuteMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to mute/unmute other members.")
+		sendError(s, m, "vckick", Permissions)
 		return
 	}
 
 	if len(command) != 2 {
-		attemptSendMsg(s, m, "Usage: `~vckick @user`")
+		sendError(s, m, "vckick", Syntax)
 		return
 	}
 
 	// 1. get user ID
 	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
 	if !regex.MatchString(command[1]) {
-		attemptSendMsg(s, m, "Usage: `~vckick @user`")
+		sendError(s, m, "vckick", Syntax)
 		return
 	}
 
@@ -704,7 +690,7 @@ func vcKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 	err := s.GuildMemberMove(m.GuildID, userID, nil)
 	if err != nil {
 		logError("Failed to remove the user from that channel! " + err.Error())
-		attemptSendMsg(s, m, "Failed to remove the user from that channel. Is it a voice channel?")
+		sendError(s, m, "vckick", Discord)
 		return
 	}
 
@@ -738,7 +724,7 @@ permission to create instant invites.
 func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if !userHasValidPermissions(s, m, discordgo.PermissionCreateInstantInvite) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to create an instant invite.")
+		sendError(s, m, "invite", Permissions)
 		return
 	}
 	var invite discordgo.Invite
@@ -747,13 +733,12 @@ func handleInvite(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	invite.MaxUses = 0    // infinite uses
 	inviteResult, err := s.ChannelInviteCreate(m.ChannelID, invite)
 	if err != nil {
-		attemptSendMsg(s, m, "Error creating invite. Try again in a moment.")
 		logError("Failed to generate invite! " + err.Error())
+		sendError(s, m, "invite", Discord)
 		return
 	} else {
 		attemptSendMsg(s, m, fmt.Sprintf(":mailbox_with_mail: Here's your invitation! https://discord.gg/%s", inviteResult.Code))
 	}
-	logSuccess("Generated and sent invite")
 }
 
 /**
@@ -762,10 +747,32 @@ Nicknames the user if they target themselves, or nicknames a target user if the 
 **/
 func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !(userHasValidPermissions(s, m, discordgo.PermissionChangeNickname) && strings.Contains(command[1], m.Author.ID)) && !(userHasValidPermissions(s, m, discordgo.PermissionManageNicknames)) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to change nicknames.")
+		sendError(s, m, "nick", Permissions)
 		return
 	}
-	attemptRename(s, m, command)
+
+	logInfo(strings.Join(command, " "))
+
+	if len(command) != 3 {
+		sendError(s, m, "nick", Syntax)
+		return
+	}
+
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		sendError(s, m, "nick", Syntax)
+		return
+	}
+
+	userID := stripUserID(command[1])
+	err := s.GuildMemberNickname(m.GuildID, userID, strings.Join(command[2:], " "))
+	if err == nil {
+		attemptSendMsg(s, m, "Done!")
+	} else {
+		logError("Failed to set nickname! " + err.Error())
+		sendError(s, m, "nick", Discord)
+		return
+	}
 }
 
 /**
@@ -773,7 +780,7 @@ Kicks a user from the server if the invoking user has the permission to kick use
 **/
 func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to kick users.")
+		sendError(s, m, "kick", Permissions)
 		return
 	}
 	attemptKick(s, m, command)
@@ -784,7 +791,7 @@ Bans a user from the server if the invoking user has the permission to ban users
 **/
 func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionBanMembers) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to ban users.")
+		sendError(s, m, "ban", Permissions)
 		return
 	}
 	attemptBan(s, m, command)
@@ -795,7 +802,7 @@ Removes the <number> most recent messages from the channel where the command was
 **/
 func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to remove messages.")
+		sendError(s, m, "purge", Permissions)
 		return
 	}
 	attemptPurge(s, m, command)
@@ -807,7 +814,7 @@ pastes it in the requested channel.
 **/
 func handleCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to manage messages.")
+		sendError(s, m, "cp", Permissions)
 		return
 	}
 	attemptCopy(s, m, command, true)
@@ -818,7 +825,7 @@ Same as above, but purges each message it copies
 **/
 func handleMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageMessages) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to manage messages.")
+		sendError(s, m, "mv", Permissions)
 		return
 	}
 	attemptCopy(s, m, command, false)
@@ -831,11 +838,18 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	// validate calling user has permission to manage emojis
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageEmojis) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to manage emojis.")
+		sendError(s, m, "emoji", Permissions)
 		return
 	}
 
-	if len(command) == 1 {
+	// which command was invoked?
+	switch command[1] {
+	case "help":
+
+		if len(command) != 2 {
+			sendError(s, m, "emoji", Syntax)
+		}
+
 		// send usage information
 		var embed discordgo.MessageEmbed
 		embed.Type = "rich"
@@ -853,25 +867,18 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 			logError("Failed to send instructions message embed! " + err.Error())
 			return
 		}
-		logSuccess("Sent user help embed for emoji")
-		return
-	}
-
-	// which command was invoked?
-	switch command[1] {
 	case "create":
-		logInfo("User invoked create for emoji command")
 		// verify correct number of arguments
 		if len(command) != 4 {
-			attemptSendMsg(s, m, "Usage:\n`emoji create <name> <url>`")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
 		// verify alphanumeric and underscores
 		matched, err := regexp.MatchString(`^[a-zA-Z0-9_]*$`, command[1])
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to determine whether the name provided was valid.")
 			logError("Failed to match regex! " + err.Error())
+			sendError(s, m, "emoji", Internal)
 			return
 		}
 		if !matched {
@@ -882,8 +889,8 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 		// convert image to base64 string
 		resp, err := http.Get(command[3])
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to get a response from the provided URL.")
 			logError("No response from URL!" + err.Error())
+			sendError(s, m, "emoji", ReadParse)
 			return
 		}
 
@@ -891,8 +898,8 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 
 		bytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to read the response from the provided URL.")
 			logError("Couldn't read response from URL!" + err.Error())
+			sendError(s, m, "emoji", ReadParse)
 			return
 		}
 
@@ -919,8 +926,8 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 		downloadSize := int64(size)
 
 		if downloadSize > 262144 {
-			attemptSendMsg(s, m, fmt.Sprintf("Please choose an image with smaller file size. Image has a size %.1fKB, which is > 256KB.", float64(downloadSize)/float64(1024.0)))
 			logError("Failed to create new emoji due to size constraints!")
+			attemptSendMsg(s, m, fmt.Sprintf("Please choose an image with smaller file size. Image has a size %.1fKB, which is > 256KB.", float64(downloadSize)/float64(1024.0)))
 			return
 		}
 
@@ -928,33 +935,30 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 
 		emoji, err := s.GuildEmojiCreate(m.GuildID, command[2], base64Image, nil)
 		if err != nil {
-			attemptSendMsg(s, m, fmt.Sprintf("Failed to create new emoji.\n```%s```", err.Error()))
 			logError("Failed to create new emoji!" + err.Error())
+			sendError(s, m, "emoji", Discord)
 			return
 		}
 
 		attemptSendMsg(s, m, fmt.Sprintf("Created emoji successfully! %s", emoji.MessageFormat()))
-		logSuccess("Created new emoji successfully")
 
 	case "delete":
-		logInfo("User invoked delete for emoji command")
-
 		// verify correct number of arguments
 		if len(command) != 3 {
-			attemptSendMsg(s, m, "Usage:\n`emoji delete <emoji>`")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
 		// validate emoji string formatting
 		matched, err := regexp.MatchString(`^(<a?)?:\w+:(\d{18}>)$`, command[2])
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to determine whether the emoji was valid.")
 			logError("Failed to match regex! " + err.Error())
+			sendError(s, m, "emoji", Internal)
 			return
 		}
 		if !matched {
-			attemptSendMsg(s, m, "Invalid argument. Please provide a valid server emoji.")
 			logError("Regex did not match!")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
@@ -962,44 +966,41 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 
 		err = s.GuildEmojiDelete(m.GuildID, emojiID)
 		if err != nil {
-			attemptSendMsg(s, m, fmt.Sprintf("Failed to remove emoji from the server.\n```%s```", err.Error()))
 			logError("Failed to remove emoji from the server! " + err.Error())
+			sendError(s, m, "emoji", Discord)
 			return
 		}
 
 		attemptSendMsg(s, m, "Removed the emoji from the server.")
-		logSuccess("Successfully deleted emoji")
 
 	case "rename":
-		logInfo("User invoked rename for emoji command")
 		// verify correct number of arguments
 		if len(command) != 4 {
-			attemptSendMsg(s, m, "Usage:\n`emoji rename <emoji> <new name>`")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
 		// verify valid emoji formatting provided for 2
 		matched, err := regexp.MatchString(`^(<a?)?:\w+:(\d{18}>)$`, command[2])
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to determine whether the emoji provided was valid.")
 			logError("Failed to match regex! " + err.Error())
+			sendError(s, m, "emoji", Internal)
 			return
 		}
 		if !matched {
-			attemptSendMsg(s, m, "Invalid argument. Please provide a valid server emoji.")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
 		// verify name is alphanumeric for 3
 		matched, err = regexp.MatchString(`^[a-zA-Z0-9_]*$`, command[3])
 		if err != nil {
-			attemptSendMsg(s, m, "Failed to determine whether the name provided was valid.")
 			logError("Failed to match regex! " + err.Error())
+			sendError(s, m, "emoji", Internal)
 			return
 		}
-
 		if !matched {
-			attemptSendMsg(s, m, "Invalid name. Please provide a name using alphanumeric characters or underscores only.")
+			sendError(s, m, "emoji", Syntax)
 			return
 		}
 
@@ -1008,13 +1009,12 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 		// set new name
 		_, err = s.GuildEmojiEdit(m.GuildID, emojiID, command[3], nil)
 		if err != nil {
-			attemptSendMsg(s, m, fmt.Sprintf("Failed to rename the emoji.\n```%s```", command[3]))
 			logError("Failed to rename emoji! " + err.Error())
+			sendError(s, m, "emoji", Discord)
 			return
 		}
 
 		attemptSendMsg(s, m, fmt.Sprintf("Renamed the emoji to %s.", command[3]))
-		logSuccess("Successfully renamed emoji")
 		return
 	}
 }

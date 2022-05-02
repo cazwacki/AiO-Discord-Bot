@@ -361,11 +361,11 @@ COMMANDS
 ****/
 func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to manage this.")
+		sendError(s, m, "modlog", Permissions)
 		return
 	}
 	if len(command) != 3 && len(command) != 2 {
-		attemptSendMsg(s, m, "Usage: `~modlog set #channel / ~modlog reset`")
+		sendError(s, m, "modlog", Syntax)
 		return
 	}
 
@@ -377,7 +377,7 @@ func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
 		if !matched {
 			logInfo("User did not specify channel correctly")
-			attemptSendMsg(s, m, "You must specify the channel correctly.")
+			sendError(s, m, "modlog", Syntax)
 			return
 		}
 
@@ -413,12 +413,12 @@ func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command 
 func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
-		attemptSendMsg(s, m, "Sorry, you aren't allowed to manage this.")
+		sendError(s, m, "greeter", Permissions)
 		return
 	}
 
 	if len(command) == 1 {
-		attemptSendMsg(s, m, "Use ~greeter help to learn more about this command.")
+		sendError(s, m, "greeter", Syntax)
 		return
 	}
 
@@ -439,6 +439,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 		if err != nil {
 			logError("Failed to send instructions message embed! " + err.Error())
+			sendError(s, m, "greeter", Discord)
 			return
 		}
 		logSuccess("Sent user help embed for greeter")
@@ -456,6 +457,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			err = query.Scan(&greeterMessage.ID, &greeterMessage.GuildID, &greeterMessage.ChannelID, &greeterMessage.MessageType, &greeterMessage.ImageLink, &greeterMessage.Message)
 			if err != nil {
 				logError("Unable to parse database information! Aborting. " + err.Error())
+				sendError(s, m, "greeter", Database)
 				return
 			}
 
@@ -487,13 +489,12 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 
 	case "set":
 		if len(command) < 5 {
-			logInfo("User did not use enough arguments when calling greeter set")
-			attemptSendMsg(s, m, "Use ~greeter help to learn more about this command.")
+			sendError(s, m, "greeter", Syntax)
 			return
 		}
 		if command[2] != "join" && command[2] != "leave" {
 			logInfo("User did not use 'join' or 'leave' when calling greeter set")
-			attemptSendMsg(s, m, "You must specify whether you are setting the join or leave message.")
+			sendError(s, m, "greeter", Syntax)
 			return
 		}
 
@@ -502,7 +503,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
 		if !matched {
 			logInfo("User did not specify channel correctly")
-			attemptSendMsg(s, m, "You must specify the channel correctly.")
+			sendError(s, m, "greeter", Syntax)
 			return
 		}
 
@@ -522,6 +523,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			fmt.Sprintf("Deleted old %s!", command[2]),
 			fmt.Sprintf("Unable to delete old %s!", command[2]),
 			m.GuildID, command[2]) {
+			sendError(s, m, "greeter", Database)
 			return
 		}
 
@@ -531,18 +533,16 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			fmt.Sprintf("Unable to add new %s!", command[2]),
 			m.GuildID, channel, command[2], imageURL, message) {
 			attemptSendMsg(s, m, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
-			logSuccess("Set new greeter message")
 		}
 	case "reset":
 		if len(command) != 3 {
-			logInfo("User did not pass in the correct number of arguments for greeter reset")
-			attemptSendMsg(s, m, "Use ~greeter help to learn more about this command.")
+			sendError(s, m, "greeter", Syntax)
 			return
 		}
 
 		if command[2] != "join" && command[2] != "leave" {
 			logInfo("User did not specify whether the join or leave message was being reset")
-			attemptSendMsg(s, m, "You must specify whether you are resetting the join or leave message.")
+			sendError(s, m, "greeter", Syntax)
 			return
 		}
 
@@ -551,21 +551,18 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			"Failed to delete the message",
 			m.GuildID, command[2]) {
 			attemptSendMsg(s, m, fmt.Sprintf("Removed message when user %ss, if there was an existing message.", command[2]))
-			logSuccess("Notified user that greeter message is removed")
 		} else {
-			attemptSendMsg(s, m, "An error occurred. Please try again in a moment.")
-			logWarning("Couldn't add new user to activity log! Is the connection still available?")
+			sendError(s, m, "greeter", Database)
 		}
 	default:
-		attemptSendMsg(s, m, "Use ~greeter help to learn more about this command.")
+		sendError(s, m, "greeter", Syntax)
 	}
 }
 
 func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if len(command) > 1 {
-		logInfo("User passed in incorrect number of arguments")
-		attemptSendMsg(s, m, "Usages: ```~leaderboard```")
+		sendError(s, m, "leaderboard", Syntax)
 		return
 	}
 
@@ -575,7 +572,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		// 1. Get all members of the guild the command was invoked in and sort by points
 		results, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ?);", leaderboardTable), m.GuildID)
 		if err != nil {
-			attemptSendMsg(s, m, "Unable to read database for existing users in the guild!\n```"+err.Error()+"```")
+			sendError(s, m, "leaderboard", Database)
 			return
 		}
 		defer results.Close()
@@ -587,6 +584,7 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 			err = results.Scan(&entry.ID, &entry.GuildID, &entry.MemberID, &entry.MemberName, &entry.Points, &entry.LastAwarded)
 			if err != nil {
 				logError("Unable to parse database information! Aborting. " + err.Error())
+				sendError(s, m, "leaderboard", Database)
 				return
 			}
 			leaderboardEntries = append(leaderboardEntries, entry)
@@ -621,21 +619,21 @@ func leaderboard(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) == 1 {
-		attemptSendMsg(s, m, "Usage: ```~activity rescan/user/whitelist/autokick/list```")
+		sendError(s, m, "activity", Syntax)
 		return
 	}
 	logInfo(strings.Join(command, " "))
 	switch command[1] {
 	case "rescan":
 		if len(command) != 2 {
-			attemptSendMsg(s, m, "Usage: ```~activity rescan```")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 		membersAdded := logNewGuild(s, m.GuildID)
 		attemptSendMsg(s, m, "Added "+strconv.Itoa(membersAdded)+" members to the database!")
 	case "user":
 		if len(command) != 3 {
-			attemptSendMsg(s, m, "Usage: ```~activity user <@user>```")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 		regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
@@ -644,24 +642,26 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 
 			// parse userID, get it from the db, present info
 			query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ? AND member_id = ?);", activityTable), m.GuildID, userID)
-			defer query.Close()
 			if err == sql.ErrNoRows {
 				logWarning("User not found in the database. This usually should not happen.")
-				attemptSendMsg(s, m, "This user isn't in our database... :frowning:")
+				sendError(s, m, "activity", Database)
 				return
 			}
+			defer query.Close()
 
 			for query.Next() {
 				var memberActivity MemberActivity
 				err = query.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 				if err != nil {
 					logError("Unable to parse database information! Aborting. " + err.Error())
+					sendError(s, m, "activity", Database)
 					return
 				}
 				dateFormat := "2006-01-02 15:04:05.999999999 -0700 MST"
 				lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
 				if err != nil {
 					logError("Unable to parse database timestamps! Aborting. " + err.Error())
+					sendError(s, m, "activity", Database)
 					return
 				}
 
@@ -677,7 +677,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				member, err := s.GuildMember(m.GuildID, userID)
 				if err != nil {
 					logError("Couldn't pull member information from the session. " + err.Error())
-					attemptSendMsg(s, m, "This user isn't in our database... :frowning:")
+					sendError(s, m, "activity", Discord)
 					return
 				}
 				var thumbnail discordgo.MessageEmbedThumbnail
@@ -689,19 +689,18 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 					logError("Failed to send user activity message! " + err.Error())
 					return
 				}
-				logSuccess("Sent user activity message")
 			}
 		}
 	case "list":
 		if len(command) != 3 {
-			attemptSendMsg(s, m, "Usage: ```~activity list <number of days of inactivity>```")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 		inactiveUsers := getInactiveUsers(s, m, command)
 		daysOfInactivity, err := strconv.Atoi(command[2])
 		if err != nil {
 			logError("Failed to convert string passed in to a number! " + err.Error())
-			attemptSendMsg(s, m, "Please input a valid number.")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 
@@ -731,6 +730,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			lastActive, err := time.Parse(dateFormat, strings.Split(inactiveUsers[i].LastActive, " m=")[0])
 			if err != nil {
 				logError("Unable to parse database timestamps! Aborting. " + err.Error())
+				sendError(s, m, "activity", Database)
 				return
 			}
 			fieldValue := "- " + lastActive.Format("01/02/2006 15:04:05") + "\n- " + inactiveUsers[i].Description
@@ -762,23 +762,25 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		err = s.MessageReactionAdd(m.ChannelID, message.ID, "◀️")
 		if err != nil {
 			logError("Failed to add reaction to activity list message! " + err.Error())
+			sendError(s, m, "activity", Discord)
 			return
 		}
 		err = s.MessageReactionAdd(m.ChannelID, message.ID, "▶️")
 		if err != nil {
 			logError("Failed to add reaction to activity list message! " + err.Error())
+			sendError(s, m, "activity", Discord)
 			return
 		}
 		logSuccess("Returned interactable activity list")
 	case "autokick":
 		if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
 			logWarning("User without appropriate permissions tried to mess with autokick")
-			attemptSendMsg(s, m, "Sorry, you don't have the `Manage Server` permission.")
+			sendError(s, m, "activity", Permissions)
 			return
 		}
 		// set autokick day check
 		if len(command) != 3 && len(command) != 2 {
-			attemptSendMsg(s, m, "Usage: ```~activity autokick <number>```")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 
@@ -786,6 +788,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			results, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ?);", autokickTable), m.GuildID)
 			if err != nil {
 				logError("Unable to read database for existing users in the guild! " + err.Error())
+				sendError(s, m, "activity", Database)
 				return
 			}
 			defer results.Close()
@@ -798,6 +801,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				err := results.Scan(&autokickData.GuildID, &autokickData.DaysUntilKick)
 				if err != nil {
 					logError("Unable to parse database information! Aborting. " + err.Error())
+					sendError(s, m, "activity", Database)
 					return
 				}
 				attemptSendMsg(s, m, fmt.Sprintf("Current set to autokick users after %d days of inactivity.", autokickData.DaysUntilKick))
@@ -812,8 +816,8 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 
 		daysOfInactivity, err := strconv.Atoi(command[2])
 		if err != nil {
-			attemptSendMsg(s, m, "Please input a valid number.")
 			logError("Failed to convert string passed in to a number! " + err.Error())
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 		logInfo(strconv.Itoa(daysOfInactivity))
@@ -824,14 +828,14 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				attemptSendMsg(s, m, "The server's auto-kick is now inactive.")
 				logSuccess("Removed server from autokick table and notified user")
 			} else {
-				attemptSendMsg(s, m, "An error occurred. Please try again in a moment.")
 				logWarning("Failed to delete autokick entry! Is the connection still available?")
+				sendError(s, m, "activity", Database)
 			}
 		} else {
 			// set autokick day count
 			if !attemptQuery(fmt.Sprintf("DELETE FROM %s WHERE (guild_id = ?);", autokickTable), "Deleted old auto-kick delay", "Failed to delete old auto-kick delay", m.GuildID) {
-				attemptSendMsg(s, m, "An error occurred. Please try again in a moment.")
 				logWarning("Failed to delete old autokick entry! Is the connection still available?")
+				sendError(s, m, "activity", Database)
 				return
 			}
 
@@ -839,34 +843,34 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 				attemptSendMsg(s, m, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
 				logSuccess("Updated server in autokick table and notified user")
 			} else {
-				attemptSendMsg(s, m, "An error occurred. Please try again in a moment.")
 				logWarning("Failed to insert new autokick entry! Is the connection still available?")
+				sendError(s, m, "activity", Database)
 			}
 		}
 	case "whitelist":
 		if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
-			attemptSendMsg(s, m, "Sorry, you don't have the `Kick Members` permission.")
+			sendError(s, m, "activity", Permissions)
 			logWarning("User attempted to use whitelist without proper permissions")
 			return
 		}
 		// ensure user is valid, then toggle that user in memberActivity
 		if len(command) != 4 {
-			attemptSendMsg(s, m, "Usage: ```~activity whitelist <@user> <true/false>```")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 
 		userID := stripUserID(command[2])
 		matched, _ := regexp.MatchString(`^[0-9]{18}$`, userID)
 		if !matched {
-			attemptSendMsg(s, m, "Invalid User ID was passed in.")
 			logWarning("User ID '" + userID + "' is invalid")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 
 		// update user's whitelist state
 		if command[3] != "true" && command[3] != "false" {
-			attemptSendMsg(s, m, "Please mark the whitelist state of the user as 'true' or 'false'.")
 			logWarning("User did not set 'true' or 'false' for the user's whitelist state")
+			sendError(s, m, "activity", Syntax)
 			return
 		}
 
@@ -875,7 +879,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			"Failed to update whitelist with new user",
 			command[3], m.GuildID, userID) {
 			if command[3] != "true" && command[3] != "false" {
-				attemptSendMsg(s, m, fmt.Sprintf("Please mark the whitelist state of the user as 'true' or 'false'."))
+				attemptSendMsg(s, m, "Please mark the whitelist state of the user as 'true' or 'false'.")
 				return
 			}
 
@@ -888,7 +892,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			logSuccess("Set user's whitelist state")
 		} else {
 			logWarning("Query failed")
-			attemptSendMsg(s, m, "An error occurred. Please try again in a moment.")
+			sendError(s, m, "activity", Database)
 		}
 	default:
 		attemptSendMsg(s, m, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>\n~activity autokick <number of days of inactivity>\n~activity whitelist <@user> true/false```")
@@ -952,12 +956,12 @@ Switches the channel that the tweet monitoring system will output to.
 **/
 func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
-		attemptSendMsg(s, m, "Sorry, you don't have the `Manage Server` permission.")
+		sendError(s, m, "autoshrine", Permissions)
 		return
 	}
 
 	if len(command) != 3 && len(command) != 2 {
-		attemptSendMsg(s, m, "Usage: `~autoshrine set #channel / ~autoshrine reset`")
+		sendError(s, m, "autoshrine", Syntax)
 		return
 	}
 
@@ -969,7 +973,7 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		matched, _ := regexp.MatchString(`^[0-9]{18}$`, channel)
 		if !matched {
 			logInfo("User did not specify channel correctly")
-			attemptSendMsg(s, m, "You must specify the channel correctly.")
+			sendError(s, m, "autoshrine", Syntax)
 			return
 		}
 
@@ -979,6 +983,7 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Removed old autoshrine channel",
 			"Couldn't remove old autoshrine channel! Is the connection still available?",
 			m.GuildID) {
+			sendError(s, m, "autoshrine", Database)
 			return
 		}
 
@@ -990,8 +995,9 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			attemptSendMsg(s, m, fmt.Sprintf("Set the autoshrine log channel to <#%s>!", channel))
 			logSuccess("Set new autoshrine channel")
 			return
+		} else {
+			sendError(s, m, "autoshrine", Database)
 		}
-
 	case "reset":
 		// remove old channel if it exists
 		if attemptQuery(fmt.Sprintf("DELETE FROM %s WHERE (guild_id = ?);", autoshrineTable),
@@ -1001,6 +1007,8 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			attemptSendMsg(s, m, "I'll stop posting shrines until you set a new channel. :slight_smile:")
 			logSuccess("Reset autoshrine channel")
 			return
+		} else {
+			sendError(s, m, "autoshrine", Database)
 		}
 	}
 }
@@ -1011,14 +1019,11 @@ Returns the users from the database who have been inactive for the requested num
 func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command []string) []MemberActivity {
 	var inactiveUsers []MemberActivity
 	// fetch all users in this guild, then filter to users who have been inactive more than <number> days
-	if len(command) != 3 {
-		attemptSendMsg(s, m, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
-		return inactiveUsers
-	}
 
 	results, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ?);", activityTable), m.GuildID)
 	if err != nil {
 		logError("Unable to read database for existing users in the guild! " + err.Error())
+		sendError(s, m, "activity", Database)
 		return inactiveUsers
 	}
 	defer results.Close()
@@ -1031,12 +1036,13 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		err = results.Scan(&memberActivity.ID, &memberActivity.GuildID, &memberActivity.MemberID, &memberActivity.MemberName, &memberActivity.LastActive, &memberActivity.Description, &memberActivity.Whitelisted)
 		if err != nil {
 			logError("Unable to parse database information! Aborting. " + err.Error())
+			sendError(s, m, "activity", Database)
 			return inactiveUsers
 		}
 
 		daysInactive, err := strconv.Atoi(command[2])
 		if err != nil {
-			attemptSendMsg(s, m, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>```")
+			sendError(s, m, "activity", Syntax)
 			return inactiveUsers
 		}
 
@@ -1047,6 +1053,7 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			lastActive, err := time.Parse(dateFormat, strings.Split(memberActivity.LastActive, " m=")[0])
 			if err != nil {
 				logError("Unable to parse database timestamps! Aborting. " + err.Error())
+				sendError(s, m, "activity", Database)
 				return inactiveUsers
 			}
 			lastActive = lastActive.AddDate(0, 0, daysInactive)

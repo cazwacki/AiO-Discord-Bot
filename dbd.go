@@ -405,7 +405,7 @@ and displays the survivor's attributes listed in the Survivor struct.
 **/
 func handleSurvivor(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 {
-		attemptSendMsg(s, m, "Usage: `~survivor <survivor name>`")
+		sendError(s, m, "survivor", Syntax)
 		return
 	}
 	requestedSurvivor := strings.Join(command[1:], " ")
@@ -415,7 +415,7 @@ func handleSurvivor(s *discordgo.Session, m *discordgo.MessageCreate, command []
 
 	// create and send response
 	if survivor.Name == "" {
-		attemptSendMsg(s, m, "Sorry! I couldn't find that survivor :frowning:")
+		sendError(s, m, "survivor", ReadParse)
 		return
 	}
 
@@ -449,7 +449,7 @@ and displays the killer's attributes listed in the Killer struct.
 **/
 func handleKiller(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 {
-		attemptSendMsg(s, m, "Usage: `~killer <killer name>`")
+		sendError(s, m, "killer", Syntax)
 		return
 	}
 	requestedKiller := strings.Join(command[1:], " ")
@@ -459,7 +459,7 @@ func handleKiller(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 	// create and send response
 	if killer.Name == "" {
-		s.ChannelMessageSend(m.ChannelID, "Sorry! I couldn't find that killer :frowning:")
+		sendError(s, m, "killer", ReadParse)
 		return
 	}
 
@@ -500,7 +500,7 @@ and displays the png icon as well as the add-on's function.
 **/
 func handleAddon(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 {
-		attemptSendMsg(s, m, "Usage: `~addon <addon name>`")
+		sendError(s, m, "addon", Syntax)
 		return
 	}
 	requestedAddonString := formatAddon(command)
@@ -509,7 +509,7 @@ func handleAddon(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 
 	// create and send response
 	if addon.Name == "" {
-		attemptSendMsg(s, m, "Sorry! I couldn't find that add-on :frowning:")
+		sendError(s, m, "addon", ReadParse)
 		return
 	}
 	// construct embed message
@@ -533,7 +533,7 @@ and displays the gif icon as well as the perk's source (if there is one) and wha
 **/
 func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	if len(command) < 2 {
-		attemptSendMsg(s, m, "Usage: `~perk <perk name>`")
+		sendError(s, m, "addon", Syntax)
 		return
 	}
 	requestedPerkString := formatPerk(command)
@@ -542,7 +542,7 @@ func handlePerk(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 
 	// create and send response
 	if perk.Name == "" {
-		attemptSendMsg(s, m, "Sorry! I couldn't find that perk :frowning:")
+		sendError(s, m, "addon", ReadParse)
 		return
 	}
 	// construct embed message
@@ -571,8 +571,8 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 	// create and send response
 	if len(shrine.Prices) == 0 {
-		attemptSendMsg(s, m, "Sorry! I wasn't able to get the shrine :frowning:")
 		logWarning("Prices didn't correctly populate. Did the website design change?")
+		sendError(s, m, "shrine", ReadParse)
 		return
 	}
 
@@ -598,5 +598,4 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		logError("Failed to send shrine embed! " + err.Error())
 		return
 	}
-	logSuccess("Sent shrine embed")
 }
