@@ -130,7 +130,7 @@ func attemptSendMsg(s *discordgo.Session, m *discordgo.MessageCreate, message st
 }
 
 /**
-Send a message, and ignore errors. This is useful to print error messages.
+Send a message indicating the error type.
 */
 func sendError(s *discordgo.Session, m *discordgo.MessageCreate, command string, errorType ErrorType) {
 	// add x reaction to message
@@ -158,4 +158,19 @@ func sendError(s *discordgo.Session, m *discordgo.MessageCreate, command string,
 		messageContent = ":bangbang: An error occurred."
 	}
 	attemptSendMsg(s, m, messageContent)
+}
+
+/**
+Send a message indicating a simple operation success, or just add a reaction.
+*/
+func sendSuccess(s *discordgo.Session, m *discordgo.MessageCreate, message string) {
+	// add check reaction to message
+	err := s.MessageReactionAdd(m.ChannelID, m.ID, "✔️")
+	if err != nil {
+		logError("Failed to react to erroring command; " + err.Error())
+	}
+
+	if message != "" {
+		attemptSendMsg(s, m, message)
+	}
 }

@@ -49,200 +49,6 @@ func dmUser(s *discordgo.Session, userID string, message string) {
 }
 
 /**
-A helper function for Handle_kick. Ensures the user targeted a user using @; if they did,
-attempt to kick the specified user.
-**/
-func attemptKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	logInfo(strings.Join(command, " "))
-
-	if len(command) < 2 {
-		sendError(s, m, "kick", Syntax)
-		return
-	}
-
-	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-	if !regex.MatchString(command[1]) {
-		sendError(s, m, "kick", Syntax)
-		return
-	}
-
-	userID := stripUserID(command[1])
-	if len(command) > 2 {
-		reason := strings.Join(command[2:], " ")
-		// dm user why they were kicked
-		guild, err := s.Guild(m.GuildID)
-		if err != nil {
-			logError("Unable to load guild! " + err.Error())
-		}
-		guildName := "error: could not retrieve"
-		if guild != nil {
-			guildName = guild.Name
-		}
-		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
-
-		// kick with reason
-		err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
-		if err != nil {
-			logError("Failed to kick user! " + err.Error())
-			sendError(s, m, "kick", Discord)
-			return
-		}
-
-		attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s for the following reason: '%s'.", command[1], reason))
-	} else {
-		// dm user they were kicked
-		guild, err := s.Guild(m.GuildID)
-		if err != nil {
-			logError("Unable to load guild! " + err.Error())
-		}
-		guildName := "error: could not retrieve"
-		if guild != nil {
-			guildName = guild.Name
-		}
-		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
-		// kick without reason
-		err = s.GuildMemberDelete(m.GuildID, userID)
-		if err != nil {
-			logError("Failed to kick user! " + err.Error())
-			sendError(s, m, "kick", Discord)
-			return
-		}
-		attemptSendMsg(s, m, fmt.Sprintf(":wave: Kicked %s.", command[1]))
-	}
-}
-
-/**
-A helper function for Handle_ban. Ensures the user targeted a user using @; if they did,
-attempt to ban the specified user.
-**/
-func attemptBan(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	logInfo(strings.Join(command, " "))
-
-	if len(command) < 2 {
-		sendError(s, m, "ban", Syntax)
-		return
-	}
-
-	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
-	if regex.MatchString(command[1]) {
-		sendError(s, m, "ban", Syntax)
-		return
-	}
-
-	userID := stripUserID(command[1])
-	if len(command) > 2 {
-		reason := strings.Join(command[2:], " ")
-
-		// dm user why they were banned
-		guild, err := s.Guild(m.GuildID)
-		if err != nil {
-			logError("Unable to load guild! " + err.Error())
-		}
-		guildName := "error: could not retrieve"
-		if guild != nil {
-			guildName = guild.Name
-		}
-		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
-
-		// ban with reason
-		err = s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
-		if err != nil {
-			logError("Failed to ban user! " + err.Error())
-			sendError(s, m, "ban", Discord)
-			return
-		}
-
-		attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s for the following reason: '%s'.", command[1], reason))
-	} else {
-		// ban without reason
-		err := s.GuildBanCreate(m.GuildID, userID, 0)
-		if err != nil {
-			logError("Failed to ban user! " + err.Error())
-			sendError(s, m, "ban", Discord)
-			return
-		}
-		// dm user they were banned
-		guild, err := s.Guild(m.GuildID)
-		if err != nil {
-			logError("Unable to load guild! " + err.Error())
-		}
-		guildName := "error: could not retrieve"
-		if guild != nil {
-			guildName = guild.Name
-		}
-		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
-
-		attemptSendMsg(s, m, fmt.Sprintf(":hammer: Banned %s.", command[1]))
-	}
-}
-
-/**
-Attempts to purge the last <number> messages, then removes the purge command.
-*/
-func attemptPurge(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
-	logInfo(strings.Join(command, " "))
-
-	if len(command) != 2 {
-		sendError(s, m, "purge", Syntax)
-		return
-	}
-
-	messageCount, err := strconv.Atoi(command[1])
-	if err != nil {
-		sendError(s, m, "purge", Syntax)
-		return
-	}
-
-	if messageCount < 1 {
-		attemptSendMsg(s, m, ":frowning: Sorry, you must purge at least 1 message. Try again.")
-		logWarning("User attempted to purge < 1 message.")
-		return
-	}
-
-	for messageCount > 0 {
-		messagesToPurge := 0
-		// can only purge 100 messages per invocation
-		if messageCount > 100 {
-			messagesToPurge = 100
-		} else {
-			messagesToPurge = messageCount
-		}
-
-		// get the last (messagesToPurge) messages from the channel
-		messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
-		if err != nil {
-			attemptSendMsg(s, m, ":frowning: I couldn't pull messages from the channel. Try again.")
-			logError("Failed to pull messages from channel! " + err.Error())
-			return
-		}
-
-		// stop purging if there is nothing left to purge
-		if len(messages) < messagesToPurge {
-			messageCount = 0
-		}
-
-		// get the message IDs
-		var messageIDs []string
-		for _, message := range messages {
-			messageIDs = append(messageIDs, message.ID)
-		}
-
-		// delete all the marked messages
-		err = s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
-		if err != nil {
-			logWarning("Failed to bulk delete messages! Attempting to continue... " + err.Error())
-		}
-		messageCount -= messagesToPurge
-	}
-	time.Sleep(time.Second)
-	err = s.ChannelMessageDelete(m.ChannelID, m.ID)
-	if err != nil {
-		logError("Failed to delete invoked command! " + err.Error())
-		return
-	}
-}
-
-/**
 Attempts to copy over the last <number> messages to the given channel, then outputs its success
 */
 func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []string, preserveMessages bool) {
@@ -377,7 +183,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		}
 	}
 
-	attemptSendMsg(s, m, fmt.Sprintf("Copied %d messages from <#%s> to <#%s>! :smile:", messageCount, m.ChannelID, channel))
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -573,7 +379,7 @@ func vcDeaf(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 		return
 	}
 
-	attemptSendMsg(s, m, "Toggled 'deafened' state of the user.")
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -616,7 +422,7 @@ func vcMute(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 		return
 	}
 
-	attemptSendMsg(s, m, "Toggled 'muted' state of the user from the channel.")
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -660,7 +466,7 @@ func vcMove(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 		return
 	}
 
-	attemptSendMsg(s, m, "Moved the user.")
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -694,7 +500,7 @@ func vcKick(s *discordgo.Session, m *discordgo.MessageCreate, command []string) 
 		return
 	}
 
-	attemptSendMsg(s, m, "Kicked the user from the channel.")
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -703,7 +509,7 @@ Forces the bot to exit with code 0. Note that in Heroku the bot will restart aut
 func handleShutdown(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if m.Author.ID == "172311520045170688" {
-		attemptSendMsg(s, m, "Shutting Down.")
+		sendSuccess(s, m, "")
 		s.Close()
 		os.Exit(0)
 	} else {
@@ -766,13 +572,13 @@ func handleNickname(s *discordgo.Session, m *discordgo.MessageCreate, command []
 
 	userID := stripUserID(command[1])
 	err := s.GuildMemberNickname(m.GuildID, userID, strings.Join(command[2:], " "))
-	if err == nil {
-		attemptSendMsg(s, m, "Done!")
-	} else {
+	if err != nil {
 		logError("Failed to set nickname! " + err.Error())
 		sendError(s, m, "nick", Discord)
 		return
 	}
+
+	sendSuccess(s, m, "")
 }
 
 /**
@@ -783,7 +589,61 @@ func handleKick(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 		sendError(s, m, "kick", Permissions)
 		return
 	}
-	attemptKick(s, m, command)
+
+	if len(command) < 2 {
+		sendError(s, m, "kick", Syntax)
+		return
+	}
+
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if !regex.MatchString(command[1]) {
+		sendError(s, m, "kick", Syntax)
+		return
+	}
+
+	userID := stripUserID(command[1])
+	if len(command) > 2 {
+		reason := strings.Join(command[2:], " ")
+		// dm user why they were kicked
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+
+		// kick with reason
+		err = s.GuildMemberDeleteWithReason(m.GuildID, userID, reason)
+		if err != nil {
+			logError("Failed to kick user! " + err.Error())
+			sendError(s, m, "kick", Discord)
+			return
+		}
+
+		sendSuccess(s, m, fmt.Sprintf(":wave: Kicked %s for the following reason: '%s'.", command[1], reason))
+	} else {
+		// dm user they were kicked
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been kicked from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
+		// kick without reason
+		err = s.GuildMemberDelete(m.GuildID, userID)
+		if err != nil {
+			logError("Failed to kick user! " + err.Error())
+			sendError(s, m, "kick", Discord)
+			return
+		}
+		sendSuccess(s, m, fmt.Sprintf(":wave: Kicked %s.", command[1]))
+	}
 }
 
 /**
@@ -794,7 +654,63 @@ func handleBan(s *discordgo.Session, m *discordgo.MessageCreate, command []strin
 		sendError(s, m, "ban", Permissions)
 		return
 	}
-	attemptBan(s, m, command)
+
+	if len(command) < 2 {
+		sendError(s, m, "ban", Syntax)
+		return
+	}
+
+	regex := regexp.MustCompile(`^\<\@\!?[0-9]+\>$`)
+	if regex.MatchString(command[1]) {
+		sendError(s, m, "ban", Syntax)
+		return
+	}
+
+	userID := stripUserID(command[1])
+	if len(command) > 2 {
+		reason := strings.Join(command[2:], " ")
+
+		// dm user why they were banned
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s because: %s\n", guildName, m.Author.Username, m.Author.Discriminator, reason))
+
+		// ban with reason
+		err = s.GuildBanCreateWithReason(m.GuildID, userID, reason, 0)
+		if err != nil {
+			logError("Failed to ban user! " + err.Error())
+			sendError(s, m, "ban", Discord)
+			return
+		}
+
+		sendSuccess(s, m, fmt.Sprintf(":hammer: Banned %s for the following reason: '%s'.", command[1], reason))
+	} else {
+		// ban without reason
+		err := s.GuildBanCreate(m.GuildID, userID, 0)
+		if err != nil {
+			logError("Failed to ban user! " + err.Error())
+			sendError(s, m, "ban", Discord)
+			return
+		}
+		// dm user they were banned
+		guild, err := s.Guild(m.GuildID)
+		if err != nil {
+			logError("Unable to load guild! " + err.Error())
+		}
+		guildName := "error: could not retrieve"
+		if guild != nil {
+			guildName = guild.Name
+		}
+		dmUser(s, userID, fmt.Sprintf("You have been banned from **%s** by %s#%s.\n", guildName, m.Author.Username, m.Author.Discriminator))
+
+		sendSuccess(s, m, fmt.Sprintf(":hammer: Banned %s.", command[1]))
+	}
 }
 
 /**
@@ -805,7 +721,65 @@ func handlePurge(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		sendError(s, m, "purge", Permissions)
 		return
 	}
-	attemptPurge(s, m, command)
+
+	if len(command) != 2 {
+		sendError(s, m, "purge", Syntax)
+		return
+	}
+
+	messageCount, err := strconv.Atoi(command[1])
+	if err != nil {
+		sendError(s, m, "purge", Syntax)
+		return
+	}
+
+	if messageCount < 1 {
+		logWarning("User attempted to purge < 1 message.")
+		attemptSendMsg(s, m, ":frowning: Sorry, you must purge at least 1 message. Try again.")
+		return
+	}
+
+	for messageCount > 0 {
+		messagesToPurge := 0
+		// can only purge 100 messages per invocation
+		if messageCount > 100 {
+			messagesToPurge = 100
+		} else {
+			messagesToPurge = messageCount
+		}
+
+		// get the last (messagesToPurge) messages from the channel
+		messages, err := s.ChannelMessages(m.ChannelID, messagesToPurge, m.ID, "", "")
+		if err != nil {
+			logError("Failed to pull messages from channel! " + err.Error())
+			attemptSendMsg(s, m, ":frowning: I couldn't pull messages from the channel. Try again.")
+			return
+		}
+
+		// stop purging if there is nothing left to purge
+		if len(messages) < messagesToPurge {
+			messageCount = 0
+		}
+
+		// get the message IDs
+		var messageIDs []string
+		for _, message := range messages {
+			messageIDs = append(messageIDs, message.ID)
+		}
+
+		// delete all the marked messages
+		err = s.ChannelMessagesBulkDelete(m.ChannelID, messageIDs)
+		if err != nil {
+			logWarning("Failed to bulk delete messages! Attempting to continue... " + err.Error())
+		}
+		messageCount -= messagesToPurge
+	}
+	time.Sleep(time.Second)
+	err = s.ChannelMessageDelete(m.ChannelID, m.ID)
+	if err != nil {
+		logError("Failed to delete invoked command! " + err.Error())
+		return
+	}
 }
 
 /**
@@ -933,14 +907,14 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 
 		base64Image += base64.StdEncoding.EncodeToString(bytes)
 
-		emoji, err := s.GuildEmojiCreate(m.GuildID, command[2], base64Image, nil)
+		_, err = s.GuildEmojiCreate(m.GuildID, command[2], base64Image, nil)
 		if err != nil {
 			logError("Failed to create new emoji!" + err.Error())
 			sendError(s, m, "emoji", Discord)
 			return
 		}
 
-		attemptSendMsg(s, m, fmt.Sprintf("Created emoji successfully! %s", emoji.MessageFormat()))
+		sendSuccess(s, m, "")
 
 	case "delete":
 		// verify correct number of arguments
@@ -971,7 +945,7 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 			return
 		}
 
-		attemptSendMsg(s, m, "Removed the emoji from the server.")
+		sendSuccess(s, m, "")
 
 	case "rename":
 		// verify correct number of arguments
@@ -1014,7 +988,6 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 			return
 		}
 
-		attemptSendMsg(s, m, fmt.Sprintf("Renamed the emoji to %s.", command[3]))
-		return
+		sendSuccess(s, m, "")
 	}
 }

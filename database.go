@@ -386,6 +386,7 @@ func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Removed old modlog channel",
 			"Couldn't remove old modlog channel! Is the connection still available?",
 			m.GuildID) {
+			sendError(s, m, "modlog", Database)
 			return
 		}
 
@@ -394,8 +395,9 @@ func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Added new modlog channel",
 			"Couldn't add new modlog channel! Is the connection still available?",
 			m.GuildID, channel) {
-			attemptSendMsg(s, m, fmt.Sprintf("Set the moderation log channel to <#%s>!", channel))
-			logSuccess("Set new modlog channel")
+			sendSuccess(s, m, "")
+		} else {
+			sendError(s, m, "modlog", Database)
 		}
 
 	case "reset":
@@ -404,8 +406,9 @@ func setModLogChannel(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Removed old modlog channel",
 			"Couldn't remove old modlog channel! Is the connection still available?",
 			m.GuildID) {
-			attemptSendMsg(s, m, "I'll stop posting mod logs until you set a new channel. :slight_smile:")
-			logSuccess("Reset modlog channel")
+			sendSuccess(s, m, "")
+		} else {
+			sendError(s, m, "modlog", Database)
 		}
 	}
 }
@@ -442,7 +445,6 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			sendError(s, m, "greeter", Discord)
 			return
 		}
-		logSuccess("Sent user help embed for greeter")
 	case "status":
 		query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s WHERE (guild_id = ?);", joinLeaveTable), m.GuildID)
 		if err != nil {
@@ -485,7 +487,6 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 		if !postedMessages {
 			attemptSendMsg(s, m, "This server currently has no greeter messages!")
 		}
-		logSuccess("Sent greeter status to user")
 
 	case "set":
 		if len(command) < 5 {
@@ -532,7 +533,9 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			fmt.Sprintf("Added new %s!", command[2]),
 			fmt.Sprintf("Unable to add new %s!", command[2]),
 			m.GuildID, channel, command[2], imageURL, message) {
-			attemptSendMsg(s, m, fmt.Sprintf("Set the new message when user %ss! Use `~greeter status` to check your messages for this server.", command[2]))
+			sendSuccess(s, m, "")
+		} else {
+			sendError(s, m, "greeter", Database)
 		}
 	case "reset":
 		if len(command) != 3 {
@@ -550,7 +553,7 @@ func greeter(s *discordgo.Session, m *discordgo.MessageCreate, command []string)
 			"Deleted the message!",
 			"Failed to delete the message",
 			m.GuildID, command[2]) {
-			attemptSendMsg(s, m, fmt.Sprintf("Removed message when user %ss, if there was an existing message.", command[2]))
+			sendSuccess(s, m, "")
 		} else {
 			sendError(s, m, "greeter", Database)
 		}
@@ -629,8 +632,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			sendError(s, m, "activity", Syntax)
 			return
 		}
-		membersAdded := logNewGuild(s, m.GuildID)
-		attemptSendMsg(s, m, "Added "+strconv.Itoa(membersAdded)+" members to the database!")
+		sendSuccess(s, m, "")
 	case "user":
 		if len(command) != 3 {
 			sendError(s, m, "activity", Syntax)
@@ -771,7 +773,6 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			sendError(s, m, "activity", Discord)
 			return
 		}
-		logSuccess("Returned interactable activity list")
 	case "autokick":
 		if !userHasValidPermissions(s, m, discordgo.PermissionManageServer) {
 			logWarning("User without appropriate permissions tried to mess with autokick")
@@ -810,7 +811,6 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			if !autokickEnabled {
 				attemptSendMsg(s, m, "Autokick is currently disabled for the server.")
 			}
-			logSuccess("Returned autokick info")
 			return
 		}
 
@@ -825,8 +825,7 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		if daysOfInactivity < 1 {
 			// remove autokick time from table
 			if attemptQuery(fmt.Sprintf("DELETE FROM %s WHERE (guild_id = ?);", autokickTable), "Deactivated auto-kick", "Failed to deactivate auto-kick", m.GuildID) {
-				attemptSendMsg(s, m, "The server's auto-kick is now inactive.")
-				logSuccess("Removed server from autokick table and notified user")
+				sendSuccess(s, m, "")
 			} else {
 				logWarning("Failed to delete autokick entry! Is the connection still available?")
 				sendError(s, m, "activity", Database)
@@ -840,8 +839,8 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			}
 
 			if attemptQuery(fmt.Sprintf("INSERT INTO %s (guild_id, days_until_kick) VALUES (?, ?);", autokickTable), "Inserted new entry", "Failed to insert new entry", m.GuildID, daysOfInactivity) {
-				attemptSendMsg(s, m, fmt.Sprintf("The server's auto-kick will now kick users that have been inactive for %d+ days.", daysOfInactivity))
 				logSuccess("Updated server in autokick table and notified user")
+				sendSuccess(s, m, "")
 			} else {
 				logWarning("Failed to insert new autokick entry! Is the connection still available?")
 				sendError(s, m, "activity", Database)
@@ -849,8 +848,8 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 		}
 	case "whitelist":
 		if !userHasValidPermissions(s, m, discordgo.PermissionKickMembers) {
-			sendError(s, m, "activity", Permissions)
 			logWarning("User attempted to use whitelist without proper permissions")
+			sendError(s, m, "activity", Permissions)
 			return
 		}
 		// ensure user is valid, then toggle that user in memberActivity
@@ -879,23 +878,17 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			"Failed to update whitelist with new user",
 			command[3], m.GuildID, userID) {
 			if command[3] != "true" && command[3] != "false" {
-				attemptSendMsg(s, m, "Please mark the whitelist state of the user as 'true' or 'false'.")
+				sendError(s, m, "activity", Syntax)
 				return
 			}
 
-			descriptor := " "
-			if command[3] == "false" {
-				descriptor = "not "
-			}
-
-			attemptSendMsg(s, m, fmt.Sprintf("Tagged user is now %sa member of the autokick whitelist.", descriptor))
-			logSuccess("Set user's whitelist state")
+			sendSuccess(s, m, "")
 		} else {
 			logWarning("Query failed")
 			sendError(s, m, "activity", Database)
 		}
 	default:
-		attemptSendMsg(s, m, "Usages: ```~activity rescan\n~activity list <number>\n~activity user <@user>\n~activity autokick <number of days of inactivity>\n~activity whitelist <@user> true/false```")
+		sendError(s, m, "activity", Syntax)
 	}
 }
 
@@ -992,8 +985,8 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Added new autoshrine channel",
 			"Couldn't add new autoshrine channel! Is the connection still available?",
 			m.GuildID, channel) {
-			attemptSendMsg(s, m, fmt.Sprintf("Set the autoshrine log channel to <#%s>!", channel))
 			logSuccess("Set new autoshrine channel")
+			sendSuccess(s, m, "")
 			return
 		} else {
 			sendError(s, m, "autoshrine", Database)
@@ -1004,8 +997,8 @@ func handleAutoshrine(s *discordgo.Session, m *discordgo.MessageCreate, command 
 			"Removed old autoshrine channel",
 			"Couldn't remove old autoshrine channel! Is the connection still available?",
 			m.GuildID) {
-			attemptSendMsg(s, m, "I'll stop posting shrines until you set a new channel. :slight_smile:")
 			logSuccess("Reset autoshrine channel")
+			sendSuccess(s, m, "")
 			return
 		} else {
 			sendError(s, m, "autoshrine", Database)
@@ -1063,6 +1056,5 @@ func getInactiveUsers(s *discordgo.Session, m *discordgo.MessageCreate, command 
 		}
 	}
 
-	logSuccess("Searched for inactive users without any errors")
 	return inactiveUsers
 }
