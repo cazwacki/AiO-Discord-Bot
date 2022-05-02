@@ -108,7 +108,7 @@ func initCommandInfo() {
 		"addon":       {handleAddon, "~addon <addon name>"},
 		"killer":      {handleKiller, "~killer <killer name>"},
 		"survivor":    {handleSurvivor, "~survivor <survivor name>"},
-		"emoji":       {emoji, "~emoji"},
+		"emoji":       {emoji, "~emoji help"},
 		"vcdeaf":      {vcDeaf, "~vcdeaf @user"},
 		"vcmute":      {vcMute, "~vcmute @user"},
 		"vcmove":      {vcMove, "~vcmove @user #!channel"},

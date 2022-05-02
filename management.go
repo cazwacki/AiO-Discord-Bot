@@ -816,6 +816,11 @@ func emoji(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 		return
 	}
 
+	if len(command) < 2 {
+		sendError(s, m, "emoji", Syntax)
+		return
+	}
+
 	// which command was invoked?
 	switch command[1] {
 	case "help":
