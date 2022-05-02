@@ -273,7 +273,7 @@ Takes a passed in time and uses the Discord embed timestamp feature to convert i
 func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	if len(command) != 3 {
-		attemptSendMsg(s, m, "Usage: `~convert <time> <IANA timezone>`\nThe website below has the usable time zones for conversions.\n\n`https://en.wikipedia.org/wiki/List_of_tz_database_time_zones`")
+		sendError(s, m, "convert", Syntax)
 		return
 	}
 
@@ -290,7 +290,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	location, err := time.LoadLocation(cmdTimezone)
 	if err != nil {
 		logError("Error loading location! " + err.Error())
-		attemptSendMsg(s, m, "Couldn't recognize that timezone.")
+		sendError(s, m, "convert", Syntax)
 		return
 	}
 	today := time.Now().In(location)
@@ -307,7 +307,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	}
 
 	if !successful_parse {
-		attemptSendMsg(s, m, "Couldn't parse that time.")
+		sendError(s, m, "convert", Syntax)
 		return
 	}
 
@@ -316,7 +316,7 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 	utc, err := time.LoadLocation("UTC")
 	if err != nil {
 		logError("Error loading UTC! " + err.Error())
-		attemptSendMsg(s, m, "Couldn't convert to UTC.")
+		sendError(s, m, "convert", Internal)
 		return
 	}
 
@@ -337,7 +337,6 @@ func handleConvert(s *discordgo.Session, m *discordgo.MessageCreate, command []s
 		logError("Failed to send result message! " + err.Error())
 		return
 	}
-	logSuccess("Sent calculated message")
 }
 
 /**
@@ -347,7 +346,7 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		attemptSendMsg(s, m, "Usage: `~urban <word/phrase>`")
+		sendError(s, m, "urban", Syntax)
 		return
 	}
 
@@ -392,7 +391,6 @@ func handleUrban(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		logError("Failed to send result message! " + err.Error())
 		return
 	}
-	logSuccess("Sent urban definition message")
 }
 
 /**
@@ -402,7 +400,7 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		attemptSendMsg(s, m, "Usage: `~define <word/phrase>`")
+		sendError(s, m, "define", Syntax)
 		return
 	}
 
@@ -451,7 +449,6 @@ func handleDefine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		logError("Failed to send result message! " + err.Error())
 		return
 	}
-	logSuccess("Sent definition message")
 }
 
 /**
@@ -461,7 +458,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo(strings.Join(command, " "))
 	// was the command invoked correctly?
 	if len(command) == 1 {
-		attemptSendMsg(s, m, "Usage: `~google <word / phrase>`")
+		sendError(s, m, "google", Syntax)
 		return
 	}
 	results := fetchResults(strings.Join(command[1:], " "), 5)
@@ -469,7 +466,7 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	// did any results come in?
 	if len(results) == 0 {
 		logWarning("No results came in. Did the website change or were there genuinely no results?")
-		attemptSendMsg(s, m, "Unable to fetch Google results. Try again later :frowning:")
+		sendError(s, m, "google", Syntax)
 		return
 	}
 
@@ -494,7 +491,6 @@ func handleGoogle(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 		logError("Failed to send result message! " + err.Error())
 		return
 	}
-	logSuccess("Sent Google Results")
 }
 
 /**
@@ -552,9 +548,6 @@ func handleImage(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		logError("Failed to add reaction to message! " + err.Error())
 		return
 	}
-
-	logSuccess("Returned image set with trackable reactions")
-
 }
 
 func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
@@ -583,7 +576,7 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 	page = fetchArticle(query)
 
 	if page.URLs == nil {
-		attemptSendMsg(s, m, ":frowning: Couldn't find an article for that. Sorry!")
+		attemptSendMsg(s, m, ":books: :frowning: Couldn't find an article for that. Sorry!")
 		logSuccess("No articles found, but no errors")
 		return
 	}
@@ -613,5 +606,4 @@ func handleWiki(s *discordgo.Session, m *discordgo.MessageCreate, command []stri
 		logError("Failed to send result message! " + err.Error())
 		return
 	}
-	logSuccess("Sent user wiki article")
 }
