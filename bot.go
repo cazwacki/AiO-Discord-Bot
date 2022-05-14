@@ -242,11 +242,11 @@ func runBot(token string) {
 	client := twitter.NewClient(httpClient)
 
 	// test twitter permissions
-	_, resp, err := client.Statuses.Show(585613041028431872, nil)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	fmt.Println(resp)
+	// _, resp, err := client.Statuses.Show(585613041028431872, nil)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+	// fmt.Println(resp)
 
 	go runTwitterLoop(client, dg)
 
