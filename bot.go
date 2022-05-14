@@ -241,6 +241,13 @@ func runBot(token string) {
 	httpClient := config.Client(oauth1.NoContext, twitter_token)
 	client := twitter.NewClient(httpClient)
 
+	// test twitter permissions
+	// _, resp, err := client.Statuses.Show(585613041028431872, nil)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+	// fmt.Println(resp)
+
 	go runTwitterLoop(client, dg)
 
 	// Wait here until CTRL-C or other term signal is received.
@@ -339,7 +346,9 @@ shrine on Twitter.
 */
 func runTwitterLoop(client *twitter.Client, dg *discordgo.Session) {
 	params := &twitter.StreamFilterParams{
-		Follow: []string{"4850837842"},
+		Follow:        []string{"1291088206902038531", "4850837842"},
+		Track:         []string{"This week's shrine"},
+		StallWarnings: twitter.Bool(true),
 	}
 	stream, err := client.Streams.Filter(params)
 	if err != nil {
