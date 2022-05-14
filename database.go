@@ -627,6 +627,27 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 	}
 	logInfo(strings.Join(command, " "))
 	switch command[1] {
+	case "help":
+		var embed discordgo.MessageEmbed
+		embed.Type = "rich"
+		embed.Title = "Activity Commands"
+		embed.Description = "The activity commands allow you to track the activity of your members at a high level, see when they last performed an action in the server, and allow you to automatically kick users that haven't taken actions in a number of days!"
+
+		var contents []*discordgo.MessageEmbedField
+		contents = append(contents, createField("~activity help", "Explains how to use the different commands.", false))
+		contents = append(contents, createField("~activity rescan", "Displays the current welcome and goodbye messages' information, if present.", false))
+		contents = append(contents, createField("~activity user (@user)", "Shows the last action taken by the pinged user in the server.", false))
+		contents = append(contents, createField("~activity list (number)", "Lists the users who haven't been active in the last (number) days. If 0 is passed in, it shows all user's activities on the server.", false))
+		contents = append(contents, createField("~activity autokick (number)", "Automatically kicks users who haven't been active in the last (number) days. If 0, disables autokicking.", false))
+		contents = append(contents, createField("~activity whitelist (@user) (true/false)", "Enables / disables the pinged user's immunity to the autokick functionality.", false))
+		embed.Fields = contents
+
+		_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+		if err != nil {
+			logError("Failed to send instructions message embed! " + err.Error())
+			sendError(s, m, "greeter", Discord)
+			return
+		}
 	case "rescan":
 		if len(command) != 2 {
 			sendError(s, m, "activity", Syntax)
