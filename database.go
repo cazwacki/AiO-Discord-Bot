@@ -873,10 +873,15 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 			return
 		}
 
+		tinyint := 0
+		if command[3] == "true" {
+			tinyint = 1
+		}
+
 		if attemptQuery(fmt.Sprintf("UPDATE %s SET whitelist = ? WHERE (guild_id = ? AND member_id = ?);", activityTable),
 			"Updated whitelist with new user",
 			"Failed to update whitelist with new user",
-			command[3], m.GuildID, userID) {
+			tinyint, m.GuildID, userID) {
 			if command[3] != "true" && command[3] != "false" {
 				sendError(s, m, "activity", Syntax)
 				return
