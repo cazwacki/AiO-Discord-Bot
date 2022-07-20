@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/dghubble/go-twitter/twitter"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -919,22 +918,27 @@ func activity(s *discordgo.Session, m *discordgo.MessageCreate, command []string
 }
 
 /**
-When a new shrine tweet is received, construct a message and post it to the designated
+When the shrine end timestamp has been passed, construct a message and post it to the designated
 autoshrine channel.
 */
-func handleTweet(s *discordgo.Session, v twitter.Tweet) {
-	logInfo("Handling a tweet")
-	logInfo(v.User.Name)
-	if v.User.ID != 4850837842 || !strings.HasPrefix(v.FullText, "This week's shrine is") {
-		logInfo("Tweet not a shrine from DeadByBHVR. Skipping...")
-		return
-	}
+func handleShrineUpdate(s *discordgo.Session) {
 	query, err := connection_pool.Query(fmt.Sprintf("SELECT * FROM %s", autoshrineTable))
 	if err != nil {
 		logError("SELECT query error, so stopping execution: " + err.Error())
 		return
 	}
 	defer query.Close()
+
+	// scrape latest shrine
+	shrine := scrapeShrine()
+	perksStr := ""
+	shardsStr := ""
+	bloodpointsStr := ""
+	for i := 0; i < len(shrine.Perks); i++ {
+		perksStr += fmt.Sprintf("[%s](%s)\n", shrine.Perks[i].Id, shrine.Perks[i].Url)
+		shardsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Shards)
+		bloodpointsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Bloodpoints)
+	}
 
 	for query.Next() {
 		// write and send embed
@@ -948,18 +952,15 @@ func handleTweet(s *discordgo.Session, v twitter.Tweet) {
 
 		// construct embed response
 		var embed discordgo.MessageEmbed
-		splitText := strings.Split(strings.ReplaceAll(v.Text, "&amp;", "&"), " ")
-		embed.URL = splitText[len(splitText)-1]
 		embed.Type = "rich"
-		embed.Title = "Latest Shrine (@DeadbyBHVR)"
-		embed.Description = strings.Join(splitText[0:len(splitText)-1], " ")
-		var image discordgo.MessageEmbedImage
-		if len(v.Entities.Media) > 0 {
-			image.URL = v.Entities.Media[0].MediaURL
-		}
-		embed.Image = &image
+		embed.Title = "Shrine Has Been Updated!"
+		var fields []*discordgo.MessageEmbedField
+		fields = append(fields, createField("Perks", perksStr, true))
+		fields = append(fields, createField("Shards", shardsStr, true))
+		fields = append(fields, createField("Bloodpoints", bloodpointsStr, true))
+		embed.Fields = fields
 		var thumbnail discordgo.MessageEmbedThumbnail
-		thumbnail.URL = "https://pbs.twimg.com/profile_images/1281644343481249798/BLUpBkgW_400x400.png"
+		thumbnail.URL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
 		embed.Thumbnail = &thumbnail
 
 		// send response
