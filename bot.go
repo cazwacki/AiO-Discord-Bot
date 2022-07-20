@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
 )
 
 var start time.Time
@@ -235,20 +233,8 @@ func runBot(token string) {
 	// start auto-kick listener
 	go runAutoKicker(dg)
 
-	/** Open Connection to Twitter **/
-	config := oauth1.NewConfig(os.Getenv("TWITTER_API_KEY"), os.Getenv("TWITTER_API_SECRET"))
-	twitter_token := oauth1.NewToken(os.Getenv("TWITTER_TOKEN"), os.Getenv("TWITTER_TOKEN_SECRET"))
-	httpClient := config.Client(oauth1.NoContext, twitter_token)
-	client := twitter.NewClient(httpClient)
-
-	// test twitter permissions
-	// _, resp, err := client.Statuses.Show(585613041028431872, nil)
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// }
-	// fmt.Println(resp)
-
-	go runTwitterLoop(client, dg)
+	// start waiting for the new shrine
+	go runNewShrineDetection(dg)
 
 	// Wait here until CTRL-C or other term signal is received.
 	fmt.Println("Bot is now running.  Press CTRL-C to exit.")
@@ -341,27 +327,26 @@ func runAutoKicker(dg *discordgo.Session) {
 }
 
 /**
-Opens a stream looking for new tweets from @DeadbyBHVR, who posts the weekly
-shrine on Twitter.
+Gets the end date of the existing shrine, waits until a few minutes after that, then posts the new shrine in all channels where ~autoshrine was configured.
 */
-func runTwitterLoop(client *twitter.Client, dg *discordgo.Session) {
-	params := &twitter.StreamFilterParams{
-		Follow:        []string{"1291088206902038531", "4850837842"},
-		Track:         []string{"This week's shrine"},
-		StallWarnings: twitter.Bool(true),
-	}
-	stream, err := client.Streams.Filter(params)
+func runNewShrineDetection(dg *discordgo.Session) {
+	shrine := scrapeShrine()
+	end_time_unix, err := strconv.ParseInt(shrine.End, 10, 64)
+	end_time_unix += 600 // add 10 minute buffer period
 	if err != nil {
-		logError("Failed to create the Twitter stream! " + err.Error())
-		return
+		logError("Failed to parse shrine end date! Is there an issue with periodic-dbd-data?")
 	}
-
-	demux := twitter.NewSwitchDemux()
-	demux.Tweet = func(tweet *twitter.Tweet) { handleTweet(dg, *tweet) }
-
-	logInfo("Listening for tweets")
-	for message := range stream.Messages {
-		demux.Handle(message)
+	for {
+		if end_time_unix < time.Now().Unix() {
+			handleShrineUpdate(dg)
+			shrine = scrapeShrine()
+			end_time_unix, err := strconv.ParseInt(shrine.End, 10, 64)
+			end_time_unix += 600 // add 10 minute buffer period
+			if err != nil {
+				logError("Failed to parse shrine end date! Is there an issue with periodic-dbd-data?")
+			}
+		}
+		time.Sleep(15 * time.Minute)
 	}
 }
 

@@ -1,10 +1,15 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
@@ -52,12 +57,19 @@ type Perk struct {
 	PageURL     string
 }
 
-// Shrine : contains information about the current shrine pulled from the wiki
+// Shrine : contains information about the current shrine pulled from the periodic-dbd-data project
 type Shrine struct {
-	Prices         []string
-	Perks          []string
-	Owners         []string
-	TimeUntilReset string
+	End   string
+	Perks []ShrinePerk
+}
+
+type ShrinePerk struct {
+	Id          string
+	Description string
+	Url         string
+	Img_Url     string
+	Bloodpoints int
+	Shards      int
 }
 
 /**
@@ -367,35 +379,29 @@ desired information in the Shrine struct created above.
 */
 func scrapeShrine() Shrine {
 	var resultingShrine Shrine
-	// Request the HTML page.
-	doc := loadPage("https://deadbydaylight.gamepedia.com/Shrine_of_Secrets")
 
-	if doc == nil {
+	request, err := http.NewRequest(http.MethodGet, "https://raw.githubusercontent.com/cazwacki/periodic-dbd-data/master/shrine.json", nil)
+	if err != nil {
 		return resultingShrine
 	}
 
-	/** Get Shrine perk info **/
-	docShrine := doc.Find(".sosTable").First()
-	docShrine.Find("td").Each(func(i int, s *goquery.Selection) {
-		switch i % 3 {
-		case 0:
-			perk := strings.ReplaceAll(s.Text(), "\n", "")
-			resultingShrine.Perks = append(resultingShrine.Perks, perk)
-		case 1:
-			price := strings.ReplaceAll(s.Text(), "\n", "")
-			resultingShrine.Prices = append(resultingShrine.Prices, price)
-		case 2:
-			owner := strings.ReplaceAll(s.Text(), "\n", "")
-			if len(strings.Split(owner, " ")) == 1 {
-				owner = "The " + owner
-			}
-			resultingShrine.Owners = append(resultingShrine.Owners, owner)
-		}
-	})
+	client := http.Client{
+		Timeout: time.Second * 2, // Timeout after 2 seconds
+	}
 
-	/** Get time until shrine resets **/
-	resultingShrine.TimeUntilReset = "Shrine " + docShrine.Find("th").Last().Text()
+	res, err := client.Do(request)
+	if err != nil || res.Body == nil {
+		return resultingShrine
+	}
 
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return resultingShrine
+	}
+
+	json.Unmarshal(body, &resultingShrine)
 	return resultingShrine
 }
 
@@ -570,8 +576,8 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo(fmt.Sprintf("%+v\n", shrine))
 
 	// create and send response
-	if len(shrine.Prices) == 0 {
-		logWarning("Prices didn't correctly populate. Did the website design change?")
+	if len(shrine.Perks) == 0 {
+		logWarning("Prices didn't correctly populate. Did the JSON structure change?")
 		sendError(s, m, "shrine", ReadParse)
 		return
 	}
@@ -579,21 +585,52 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	logInfo("Retrieved the shrine")
 	// construct embed response
 	var embed discordgo.MessageEmbed
-	embed.URL = "https://deadbydaylight.gamepedia.com/Shrine_of_Secrets#Current_Shrine_of_Secrets"
 	embed.Type = "rich"
 	embed.Title = "Current Shrine"
 	var fields []*discordgo.MessageEmbedField
-	fields = append(fields, createField("Perk", shrine.Perks[0]+"\n"+shrine.Perks[1]+"\n"+shrine.Perks[2]+"\n"+shrine.Perks[3], true))
-	fields = append(fields, createField("Price", shrine.Prices[0]+"\n"+shrine.Prices[1]+"\n"+shrine.Prices[2]+"\n"+shrine.Prices[3], true))
-	fields = append(fields, createField("Unique to", shrine.Owners[0]+"\n"+shrine.Owners[1]+"\n"+shrine.Owners[2]+"\n"+shrine.Owners[3], true))
+	perksStr := ""
+	shardsStr := ""
+	bloodpointsStr := ""
+	for i := 0; i < len(shrine.Perks); i++ {
+		perksStr += fmt.Sprintf("[%s](%s)\n", shrine.Perks[i].Id, shrine.Perks[i].Url)
+		shardsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Shards)
+		bloodpointsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Bloodpoints)
+	}
+	fields = append(fields, createField("Perks", perksStr, true))
+	fields = append(fields, createField("Shards", shardsStr, true))
+	fields = append(fields, createField("Bloodpoints", bloodpointsStr, true))
 	embed.Fields = fields
+
+	shrineEndStr, err := strconv.ParseInt(shrine.End, 10, 64)
+	if err != nil {
+		logError("Error parsing shrine end! " + err.Error())
+		sendError(s, m, "convert", Syntax)
+		return
+	}
+
+	shrineEndTime := time.Unix(shrineEndStr, 0)
+
+	// convert fetched time into utc timestamp for discord
+	discordTimestamp := "2006-01-02T15:04:05.999Z"
+	utc, err := time.LoadLocation("UTC")
+	if err != nil {
+		logError("Error loading UTC! " + err.Error())
+		sendError(s, m, "convert", Internal)
+		return
+	}
+
+	adjustedTime := shrineEndTime.In(utc)
+	logInfo(adjustedTime.Format(discordTimestamp))
+
 	var footer discordgo.MessageEmbedFooter
-	footer.Text = shrine.TimeUntilReset
+	footer.Text = "Shrine refreshes on"
+	embed.Timestamp = adjustedTime.Format(discordTimestamp)
+	embed.Footer = &footer
 	footer.IconURL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
 	embed.Footer = &footer
 
 	// send response
-	_, err := s.ChannelMessageSendEmbed(m.ChannelID, &embed)
+	_, err = s.ChannelMessageSendEmbed(m.ChannelID, &embed)
 	if err != nil {
 		logError("Failed to send shrine embed! " + err.Error())
 		return
