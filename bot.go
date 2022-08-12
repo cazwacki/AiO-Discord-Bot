@@ -331,20 +331,15 @@ Gets the end date of the existing shrine, waits until a few minutes after that, 
 */
 func runNewShrineDetection(dg *discordgo.Session) {
 	shrine := scrapeShrine()
-	end_time_unix, err := strconv.ParseInt(shrine.End, 10, 64)
-	end_time_unix += 600 // add 10 minute buffer period
-	if err != nil {
-		logError("Failed to parse shrine end date! Is there an issue with periodic-dbd-data?")
-	}
+	fmt.Printf("End Time: %d, Now: %d", shrine.End, time.Now().Unix())
+	end_time_unix := shrine.End + 600 // add 10 minute buffer period
 	for {
 		if end_time_unix < time.Now().Unix() {
 			handleShrineUpdate(dg)
 			shrine = scrapeShrine()
-			end_time_unix, err := strconv.ParseInt(shrine.End, 10, 64)
+			end_time_unix = shrine.End
+			fmt.Printf("End Time: %d, Now: %d", end_time_unix, time.Now().Unix())
 			end_time_unix += 600 // add 10 minute buffer period
-			if err != nil {
-				logError("Failed to parse shrine end date! Is there an issue with periodic-dbd-data?")
-			}
 		}
 		time.Sleep(15 * time.Minute)
 	}
@@ -505,6 +500,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// verify the message came from within the guild
 	for _, link := range match {
 		linkData := strings.Split(link[0], "/")
+		fmt.Printf("%s\n", linkData[5])
 		if linkData[4] == m.GuildID {
 			var embed discordgo.MessageEmbed
 			embed.Type = "rich"
@@ -539,7 +535,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			// add user's message information
 			embed.Description = linkedMessage.Content
-			embed.Timestamp = string(linkedMessage.Timestamp)
+			embed.Timestamp = linkedMessage.Timestamp.String()
 
 			linkedMessageChannel, err := s.Channel(linkData[5])
 			if err != nil {

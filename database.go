@@ -932,12 +932,8 @@ func handleShrineUpdate(s *discordgo.Session) {
 	// scrape latest shrine
 	shrine := scrapeShrine()
 	perksStr := ""
-	shardsStr := ""
-	bloodpointsStr := ""
 	for i := 0; i < len(shrine.Perks); i++ {
 		perksStr += fmt.Sprintf("[%s](%s)\n", shrine.Perks[i].Id, shrine.Perks[i].Url)
-		shardsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Shards)
-		bloodpointsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Bloodpoints)
 	}
 
 	for query.Next() {
@@ -950,14 +946,32 @@ func handleShrineUpdate(s *discordgo.Session) {
 		}
 		logInfo("Sending shrine data to " + autoshrineData.GuildID + " " + autoshrineData.ChannelID)
 
+		// images
+		var image_embeds []*discordgo.MessageEmbed
+		for i := 0; i < 4; i++ {
+
+			var image discordgo.MessageEmbedImage
+			image.URL = fmt.Sprintf("https://raw.githubusercontent.com/cazwacki/cazwacki.github.io/master/public/dbd/%s", shrine.Perks[i].Img_Url)
+			image_embeds = append(image_embeds, &discordgo.MessageEmbed{
+				Image: &image,
+				URL:   "https://google.com",
+			})
+		}
+		_, err = s.ChannelMessageSendEmbeds(autoshrineData.ChannelID, image_embeds)
+		if err != nil {
+			logError("Failed to send shrine image embed! " + err.Error())
+			return
+		}
+
 		// construct embed response
 		var embed discordgo.MessageEmbed
 		embed.Type = "rich"
 		embed.Title = "Shrine Has Been Updated!"
 		var fields []*discordgo.MessageEmbedField
-		fields = append(fields, createField("Perks", perksStr, true))
-		fields = append(fields, createField("Shards", shardsStr, true))
-		fields = append(fields, createField("Bloodpoints", bloodpointsStr, true))
+		for i := 0; i < len(shrine.Perks); i++ {
+			info := fmt.Sprintf("[Wiki Link](%s)\n", shrine.Perks[i].Url) + shrine.Perks[i].Description
+			fields = append(fields, createField(shrine.Perks[i].Id, info, false))
+		}
 		embed.Fields = fields
 		var thumbnail discordgo.MessageEmbedThumbnail
 		thumbnail.URL = "https://gamepedia.cursecdn.com/deadbydaylight_gamepedia_en/thumb/1/14/IconHelp_shrineOfSecrets.png/32px-IconHelp_shrineOfSecrets.png"
@@ -966,7 +980,7 @@ func handleShrineUpdate(s *discordgo.Session) {
 		// send response
 		_, err = s.ChannelMessageSendEmbed(autoshrineData.ChannelID, &embed)
 		if err != nil {
-			logError("Failed to send tweet embed! " + err.Error())
+			logError("Failed to send embed! " + err.Error())
 			return
 		}
 	}

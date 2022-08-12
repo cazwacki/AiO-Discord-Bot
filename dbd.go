@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -59,7 +58,7 @@ type Perk struct {
 
 // Shrine : contains information about the current shrine pulled from the periodic-dbd-data project
 type Shrine struct {
-	End   string
+	End   int64
 	Perks []ShrinePerk
 }
 
@@ -68,8 +67,6 @@ type ShrinePerk struct {
 	Description string
 	Url         string
 	Img_Url     string
-	Bloodpoints int
-	Shards      int
 }
 
 /**
@@ -402,6 +399,7 @@ func scrapeShrine() Shrine {
 	}
 
 	json.Unmarshal(body, &resultingShrine)
+	fmt.Printf("%+v\n", resultingShrine)
 	return resultingShrine
 }
 
@@ -588,27 +586,14 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	embed.Type = "rich"
 	embed.Title = "Current Shrine"
 	var fields []*discordgo.MessageEmbedField
-	perksStr := ""
-	shardsStr := ""
-	bloodpointsStr := ""
+	perkStr := ""
 	for i := 0; i < len(shrine.Perks); i++ {
-		perksStr += fmt.Sprintf("[%s](%s)\n", shrine.Perks[i].Id, shrine.Perks[i].Url)
-		shardsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Shards)
-		bloodpointsStr += fmt.Sprintf("%d\n", shrine.Perks[i].Bloodpoints)
+		perkStr += fmt.Sprintf("[%s](%s)\n", shrine.Perks[i].Id, shrine.Perks[i].Url)
 	}
-	fields = append(fields, createField("Perks", perksStr, true))
-	fields = append(fields, createField("Shards", shardsStr, true))
-	fields = append(fields, createField("Bloodpoints", bloodpointsStr, true))
+	fields = append(fields, createField("Perks", perkStr, false))
 	embed.Fields = fields
 
-	shrineEndStr, err := strconv.ParseInt(shrine.End, 10, 64)
-	if err != nil {
-		logError("Error parsing shrine end! " + err.Error())
-		sendError(s, m, "convert", Syntax)
-		return
-	}
-
-	shrineEndTime := time.Unix(shrineEndStr, 0)
+	shrineEndTime := time.Unix(shrine.End, 0)
 
 	// convert fetched time into utc timestamp for discord
 	discordTimestamp := "2006-01-02T15:04:05.999Z"
@@ -620,7 +605,6 @@ func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 	}
 
 	adjustedTime := shrineEndTime.In(utc)
-	logInfo(adjustedTime.Format(discordTimestamp))
 
 	var footer discordgo.MessageEmbedFooter
 	footer.Text = "Shrine refreshes on"

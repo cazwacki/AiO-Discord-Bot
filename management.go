@@ -124,7 +124,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		embed.Author = &embedAuthor
 
 		// preserve message timestamp
-		embed.Timestamp = string(message.Timestamp)
+		embed.Timestamp = message.Timestamp.String()
 		var contents []*discordgo.MessageEmbedField
 
 		// output message text
@@ -282,19 +282,12 @@ func attemptAbout(s *discordgo.Session, m *discordgo.MessageCreate, command []st
 
 	var contents []*discordgo.MessageEmbedField
 
-	joinDate, err := member.JoinedAt.Parse()
-	if err != nil {
-		logError("Failed to parse Discord dates! " + err.Error())
-		sendError(s, m, "about", Internal)
-		return
-	}
-
 	nickname := "N/A"
 	if member.Nick != "" {
 		nickname = member.Nick
 	}
 
-	contents = append(contents, createField("Server Join Date", joinDate.Format("01/02/2006"), false))
+	contents = append(contents, createField("Server Join Date", member.JoinedAt.Format("01/02/2006"), false))
 	contents = append(contents, createField("Nickname", nickname, false))
 
 	// get user's roles in readable form
