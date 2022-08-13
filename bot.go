@@ -331,14 +331,12 @@ Gets the end date of the existing shrine, waits until a few minutes after that, 
 */
 func runNewShrineDetection(dg *discordgo.Session) {
 	shrine := scrapeShrine()
-	fmt.Printf("End Time: %d, Now: %d", shrine.End, time.Now().Unix())
 	end_time_unix := shrine.End + 600 // add 10 minute buffer period
 	for {
 		if end_time_unix < time.Now().Unix() {
 			handleShrineUpdate(dg)
 			shrine = scrapeShrine()
 			end_time_unix = shrine.End
-			fmt.Printf("End Time: %d, Now: %d", end_time_unix, time.Now().Unix())
 			end_time_unix += 600 // add 10 minute buffer period
 		}
 		time.Sleep(15 * time.Minute)
@@ -493,7 +491,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID || m.GuildID == "" {
 		return
 	}
-	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]{18}\/[0-9]{18}\/[0-9]{18}`)
+	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]*\/[0-9]*\/[0-9]*`)
 	match := regex.FindAllStringSubmatch(m.Content, -1)
 	logInfo(fmt.Sprintf("Number of matches is %d", len(match)))
 
@@ -535,7 +533,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			// add user's message information
 			embed.Description = linkedMessage.Content
-			embed.Timestamp = linkedMessage.Timestamp.String()
+			embed.Timestamp = linkedMessage.Timestamp.Format("2006-01-02T15:04:05-0700")
 
 			linkedMessageChannel, err := s.Channel(linkData[5])
 			if err != nil {

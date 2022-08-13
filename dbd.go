@@ -399,7 +399,6 @@ func scrapeShrine() Shrine {
 	}
 
 	json.Unmarshal(body, &resultingShrine)
-	fmt.Printf("%+v\n", resultingShrine)
 	return resultingShrine
 }
 
@@ -571,7 +570,6 @@ post and outputs its information.
 func handleShrine(s *discordgo.Session, m *discordgo.MessageCreate, command []string) {
 	logInfo(strings.Join(command, " "))
 	shrine := scrapeShrine()
-	logInfo(fmt.Sprintf("%+v\n", shrine))
 
 	// create and send response
 	if len(shrine.Perks) == 0 {
