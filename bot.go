@@ -493,7 +493,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID || m.GuildID == "" {
 		return
 	}
-	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]{18}\/[0-9]{18}\/[0-9]{18}`)
+	regex := regexp.MustCompile(`https:\/\/discord.com\/channels\/[0-9]*\/[0-9]*\/[0-9]*`)
 	match := regex.FindAllStringSubmatch(m.Content, -1)
 	logInfo(fmt.Sprintf("Number of matches is %d", len(match)))
 
@@ -535,7 +535,7 @@ func checkForMessageLink(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			// add user's message information
 			embed.Description = linkedMessage.Content
-			embed.Timestamp = linkedMessage.Timestamp.String()
+			embed.Timestamp = linkedMessage.Timestamp.Format("2006-01-02T15:04:05-0700")
 
 			linkedMessageChannel, err := s.Channel(linkData[5])
 			if err != nil {
