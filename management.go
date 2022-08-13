@@ -124,7 +124,7 @@ func attemptCopy(s *discordgo.Session, m *discordgo.MessageCreate, command []str
 		embed.Author = &embedAuthor
 
 		// preserve message timestamp
-		embed.Timestamp = message.Timestamp.String()
+		embed.Timestamp = message.Timestamp.Format("2006-01-02T15:04:05-0700")
 		var contents []*discordgo.MessageEmbedField
 
 		// output message text
