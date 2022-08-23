@@ -15,9 +15,19 @@
         "TWITTER_TOKEN": "",
         "TWITTER_TOKEN_SECRET": "",
         "GOOGLE_API_KEY": "",
-        "GOOGLE_CREDENTIALS": "",
+        "GOOGLE_CREDENTIALS": "==",
         "LINGUA_API_KEY": "",
-        "URBAN_DICTIONARY_API_KEY": ""
+        "URBAN_DICTIONARY_API_KEY": "",
+        "DB_HOST": "",
+        "DB": "",
+        "DB_USERNAME": "",
+        "DB_PASSWORD": "!",
+        "ACTIVITY_TABLE": "",
+        "LEADERBOARD_TABLE": "",
+        "JOIN_LEAVE_TABLE": "",
+        "AUTOKICK_TABLE": "",
+        "MODLOG_TABLE": "",
+        "AUTOSHRINE_TABLE": ""
     },
     "runArgs": [
         "--rm"
