@@ -1,5 +1,6 @@
 {
     "image": "mcr.microsoft.com/vscode/devcontainers/go:1.16",
+    "containerUser": "vscode",
     "customizations": {
         "vscode": {
             "extensions": [
