@@ -9,14 +9,15 @@
         }
     },
     "containerEnv": {
-        "BOT_TOKEN": "discord_token_here",
-        "TWITTER_API_KEY": "api_key_here",
-        "TWITTER_API_SECRET": "api_secret_here",
-        "TWITTER_TOKEN": "token_here",
-        "TWITTER_TOKEN_SECRET": "token_secret_here",
-        "GOOGLE_API_KEY": "api_key_here",
-        "LINGUA_API_KEY": "api_key_here",
-        "URBAN_DICTIONARY_API_KEY": "api_key_here"
+        "BOT_TOKEN": "",
+        "TWITTER_API_KEY": "",
+        "TWITTER_API_SECRET": "",
+        "TWITTER_TOKEN": "",
+        "TWITTER_TOKEN_SECRET": "",
+        "GOOGLE_API_KEY": "",
+        "GOOGLE_CREDENTIALS": "",
+        "LINGUA_API_KEY": "",
+        "URBAN_DICTIONARY_API_KEY": ""
     },
     "runArgs": [
         "--rm"
