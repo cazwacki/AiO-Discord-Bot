@@ -1,0 +1,25 @@
+{
+    "image": "mcr.microsoft.com/vscode/devcontainers/go:1.16",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "golang.Go",
+                "dbaeumer.vscode-eslint"
+            ]
+        }
+    },
+    "containerEnv": {
+        "BOT_TOKEN": "discord_token_here",
+        "TWITTER_API_KEY": "api_key_here",
+        "TWITTER_API_SECRET": "api_secret_here",
+        "TWITTER_TOKEN": "token_here",
+        "TWITTER_TOKEN_SECRET": "token_secret_here",
+        "GOOGLE_API_KEY": "api_key_here",
+        "LINGUA_API_KEY": "api_key_here",
+        "URBAN_DICTIONARY_API_KEY": "api_key_here"
+    },
+    "runArgs": [
+        "--rm"
+    ],
+    "shutdownAction": "stopContainer"
+}
