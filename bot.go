@@ -330,14 +330,16 @@ func runAutoKicker(dg *discordgo.Session) {
 Gets the end date of the existing shrine, waits until a few minutes after that, then posts the new shrine in all channels where ~autoshrine was configured.
 */
 func runNewShrineDetection(dg *discordgo.Session) {
-	shrine := scrapeShrine()
-	end_time_unix := shrine.End + 600 // add 10 minute buffer period
+	old_shrine := scrapeShrine()
+	end_time_unix := old_shrine.End + 600 // add 10 minute buffer period
 	for {
 		if end_time_unix < time.Now().Unix() {
-			handleShrineUpdate(dg)
-			shrine = scrapeShrine()
-			end_time_unix = shrine.End
-			end_time_unix += 600 // add 10 minute buffer period
+			new_shrine := scrapeShrine()
+			if new_shrine.End > end_time_unix {
+				handleShrineUpdate(dg)
+				end_time_unix = new_shrine.End
+				end_time_unix += 600 // add 10 minute buffer period
+			}
 		}
 		time.Sleep(15 * time.Minute)
 	}
