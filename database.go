@@ -946,23 +946,6 @@ func handleShrineUpdate(s *discordgo.Session) {
 		}
 		logInfo("Sending shrine data to " + autoshrineData.GuildID + " " + autoshrineData.ChannelID)
 
-		// images
-		var image_embeds []*discordgo.MessageEmbed
-		for i := 0; i < 4; i++ {
-
-			var image discordgo.MessageEmbedImage
-			image.URL = fmt.Sprintf("https://raw.githubusercontent.com/cazwacki/cazwacki.github.io/master/public/dbd/%s", shrine.Perks[i].Img_Url)
-			image_embeds = append(image_embeds, &discordgo.MessageEmbed{
-				Image: &image,
-				URL:   "https://google.com",
-			})
-		}
-		_, err = s.ChannelMessageSendEmbeds(autoshrineData.ChannelID, image_embeds)
-		if err != nil {
-			logError("Failed to send shrine image embed! " + err.Error())
-			return
-		}
-
 		// construct embed response
 		var embed discordgo.MessageEmbed
 		embed.Type = "rich"
