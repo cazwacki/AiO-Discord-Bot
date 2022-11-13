@@ -21,7 +21,7 @@ UPDATE: No longer going to be using Travis-CI as of 12/11/2020. Not going to pay
 
 (The bot detects message links. If the source message is in the guild, it will output it in the chat after the user's message.)
 
-Commands are available at https://charles.zawackis.com/bot-commands.html.
+Commands are available at https://charles.zawackis.com/#/bot-commands.
 
 ## Things I Have Learned
 
